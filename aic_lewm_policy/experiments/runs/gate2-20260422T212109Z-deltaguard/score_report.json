@@ -1,0 +1,30 @@
+{
+  "parsed_at_utc": "2026-04-22T22:50:57Z",
+  "path": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval/scoring.yaml",
+    "total": 128.01721760888628,
+    "trial_count": 3,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 22.76905519662595,
+        "tier_3": 24.847868609444124,
+        "total": 48.616923806070076
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 23.006153479349994,
+        "tier_3": 25.0,
+        "total": 49.00615347934999
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 22.818571883464337,
+        "tier_3": 6.575568440001901,
+        "total": 30.39414032346624
+      }
+    }
+  }
+}

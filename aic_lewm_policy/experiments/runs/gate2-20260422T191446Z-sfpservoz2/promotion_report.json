@@ -1,0 +1,23 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T21:03:48Z",
+  "decision": "rejected",
+  "eligible_for_submission": false,
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T191446Z-sfpservoz2/manifest.json",
+  "metric": {
+    "baseline_value": 127.78018667287431,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 127.29417416446411
+  },
+  "notes": [
+    "Promotion gate was run after official replay evaluation.",
+    "Expected rejection: the guarded SFP final servo underperformed the current SC-stop promoted baseline."
+  ],
+  "reason": "127.29417416446411 < 127.78018667287431 + 1.0",
+  "report_path": "promotion_report.json",
+  "run_id": "gate2-20260422T191446Z-sfpservoz2",
+  "schema_version": 1
+}

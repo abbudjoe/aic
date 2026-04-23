@@ -1,0 +1,18 @@
+{
+  "parsed_at_utc": "2026-04-21T22:55:38Z",
+  "path": "artifacts/real-20260421T224028Z-aic-lewm-3trial-train-lowgz/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/real-20260421T224028Z-aic-lewm-3trial-train-lowgz/eval/scoring.yaml",
+    "total": 1.0,
+    "trial_count": 1,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 0.0,
+        "tier_3": 0.0,
+        "total": 1.0
+      }
+    }
+  }
+}

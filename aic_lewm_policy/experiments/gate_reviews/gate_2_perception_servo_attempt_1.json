@@ -1,0 +1,22 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "gate2-20260422T135752Z-replay6p5 extended the 20Hz replay horizon and scored 122.390015 total, but had no contact or insertion credit.",
+    "The 20Hz ablation exposed a cadence contract bug: RecordingCheatCode records demonstrations at 10Hz by default, while replay runtime and cloud scripts defaulted to 20Hz.",
+    "gate2-20260422T152543Z-replay10hz7p2 ran the full 10Hz demonstration horizon and scored 96.589071 total, below the promoted 122.390015 baseline.",
+    "10Hz replay materially improved the SFP trials: trial 1 scored 48.623396 and trial 2 scored 48.962676 with final distance 0.02m.",
+    "The SC trial regressed to -0.997001 because an enclosure contact penalty was applied and final distance remained 0.11m.",
+    "No insertion was detected in any trial, so Gate 2 is not complete."
+  ],
+  "gate_id": "gate_2_perception_servo",
+  "next_requirements": [
+    "Keep the 10Hz replay cadence contract enforced by defaults and tests.",
+    "Add task/cable-specific replay stopping or gain scheduling so SC replay does not drive into the enclosure.",
+    "Use legal observations for a final-centimeter servo instead of extending pure open-loop replay.",
+    "Add an offline bag analysis that identifies per-trial stop points, final image alignment, and contact-risk signatures before the next official run.",
+    "Gate 2 completion still requires official insertion/contact evidence or a large Tier 3 gain without environment collision penalties."
+  ],
+  "reviewed_at_utc": "2026-04-22T16:58:03Z",
+  "run_id": "gate2-20260422T152543Z-replay10hz7p2",
+  "schema_version": 1
+}

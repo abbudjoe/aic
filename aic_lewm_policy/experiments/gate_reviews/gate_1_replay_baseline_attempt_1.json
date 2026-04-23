@@ -1,0 +1,19 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "Official replay eval replay-20260422T042338Z-aic-replay-gate1 completed all three trials and scored 3.0 total.",
+    "Replay selected exact demonstration episodes for all three public task/module combinations.",
+    "Each trial received only Tier 1 model-validity credit; Tier 2 and Tier 3 were zero on every trial.",
+    "The policy used official observations/task metadata and did not query eval-time ground-truth TF."
+  ],
+  "gate_id": "gate_1_replay_baseline",
+  "next_requirements": [
+    "Do not mark Gate 1 complete and do not advance to Gate 2 completion criteria on replay alone.",
+    "Inspect trial bags/model logs enough to quantify replay drift direction and final plug-port distance.",
+    "Implement a closed-loop correction primitive before the next official run: either visual servo from wrist images or a legal pose/alignment estimator distilled from training-time TF.",
+    "Keep replay as the open-loop motion prior, but gate the next candidate on earning nonzero Tier 3 proximity credit."
+  ],
+  "reviewed_at_utc": "2026-04-22T05:06:30Z",
+  "run_id": "replay-20260422T042338Z-aic-replay-gate1",
+  "schema_version": 1
+}

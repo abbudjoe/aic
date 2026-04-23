@@ -1,0 +1,30 @@
+{
+  "parsed_at_utc": "2026-04-22T15:23:06Z",
+  "path": "artifacts/cloud-logs/gate2-20260422T135752Z-replay6p5/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/cloud-logs/gate2-20260422T135752Z-replay6p5/eval/scoring.yaml",
+    "total": 122.39001511101944,
+    "trial_count": 3,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 21.468307244461176,
+        "tier_3": 24.704406129575197,
+        "total": 47.17271337403638
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 22.935041317252725,
+        "tier_3": 14.383282975116728,
+        "total": 38.318324292369454
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 22.903813506801143,
+        "tier_3": 12.995163937812457,
+        "total": 36.8989774446136
+      }
+    }
+  }
+}

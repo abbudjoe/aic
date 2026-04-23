@@ -1,0 +1,174 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/replay_check.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_2_perception_servo_attempt_1.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T152543Z-replay10hz7p2/harness/gate_reviews/gate_2_perception_servo_attempt_1.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T16:58:03Z",
+  "dataset": {
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 2 ablation: align replay indexing with the 10Hz RecordingCheatCode collection cadence and run the full recorded demonstration horizon.",
+  "evaluation": {
+    "analysis": {
+      "baseline_total": 122.39001511101944,
+      "delta_vs_baseline": -25.80094383113166,
+      "finding": "10Hz replay improves the SFP trials and reaches 0.02m on trial 2, but full-horizon SC replay collides with the enclosure and loses the candidate overall."
+    },
+    "official_result_path": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval/scoring.yaml",
+    "participant_image": "aic-lewm-gate2:gate2-20260422T152543Z-replay10hz7p2",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "replay_hz": 10.0,
+      "report_path": "replay_check.json"
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "9000",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_DEVICE": "cpu",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "7.2",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "10",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "0"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval/scoring.yaml",
+      "total": 96.58907127988778,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 22.77361779867038,
+          "tier_3": 24.849778411850135,
+          "total": 48.62339621052051
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 22.96267573913358,
+          "tier_3": 25.0,
+          "total": 48.96267573913358
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": -2.078080702266157,
+          "tier_3": 0.08108003249984351,
+          "total": -0.9970006697663136
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "trial_summary": {
+      "contact_detected": true,
+      "contact_messages": [
+        "trial_3: Contacts detected (only first reported) between entity named [ur5e::wrist_3_link::wrist_3_link_fixed_joint_lump__lens_collider_cylinder_collision_12] and [enclosure::enclosure_link::v1015026001_collider_box]. Penalty applied."
+      ],
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.05,
+      "trial_2_final_distance_m": 0.02,
+      "trial_3_final_distance_m": 0.11
+    }
+  },
+  "hypothesis": "If replay failures were caused by consuming 10Hz demonstrations at 20Hz, matching replay_hz to 10Hz should improve final alignment and expose whether pure replay can earn insertion/contact credit.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Default replay_hz was corrected from 20Hz to 10Hz to match RecordingCheatCode collection cadence.",
+    "Trial 1 and trial 2 improved to 48.62 and 48.96, with trial 2 ending 0.02m from the port.",
+    "Trial 3 regressed to -0.997 due to an enclosure contact penalty and no insertion."
+  ],
+  "promotion": {
+    "accepted": false,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T16:58:03Z",
+    "decision": "rejected",
+    "eligible_for_submission": false,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T152543Z-replay10hz7p2/manifest.json",
+    "metric": {
+      "baseline_value": 122.39001511101944,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 96.58907127988778
+    },
+    "notes": [
+      "Promotion gate was run after official replay evaluation.",
+      "Rejected as the active baseline because the SC trial collision erased the SFP gains."
+    ],
+    "reason": "96.58907127988778 < 122.39001511101944 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T152543Z-replay10hz7p2",
+    "schema_version": 1
+  },
+  "run_id": "gate2-20260422T152543Z-replay10hz7p2",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T16:58:33Z"
+}

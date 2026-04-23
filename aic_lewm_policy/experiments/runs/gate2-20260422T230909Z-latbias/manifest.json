@@ -1,0 +1,269 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/replay_check.json"
+    },
+    {
+      "kind": "bag_analysis",
+      "path": "bag_analysis.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/bag_analysis.json"
+    },
+    {
+      "kind": "lateral_bias_analysis",
+      "path": "lateral_bias_analysis.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/lateral_bias_analysis.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/gate2-20260422T230909Z-latbias",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_2_perception_servo_attempt_5.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T230909Z-latbias/harness/gate_reviews/gate_2_perception_servo_attempt_5.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-23T00:49:23Z",
+  "dataset": {
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 2 candidate: apply a mined lateral-bias final SFP servo vector with delta force guarding.",
+  "evaluation": {
+    "analysis": {
+      "baseline_total": 127.78018667287431,
+      "delta_vs_previous_deltaguard": -0.00849339940393179,
+      "delta_vs_promoted_baseline": 0.22853753660804443,
+      "finding": "The mined lateral-bias final servo completed legally but slightly underperformed the delta-guard candidate and did not earn insertion credit; trial 1 tripped the delta force guard after a 6.11N increase."
+    },
+    "bag_analysis": {
+      "final_tcp_errors": {
+        "trial_1": [
+          -0.0002884982328384966,
+          -0.0038959342653075713,
+          -0.028664984921960596
+        ],
+        "trial_2": [
+          0.0010774320272363136,
+          -0.00012170513430415086,
+          0.00866723340376696
+        ],
+        "trial_3": [
+          -0.00020671279699979728,
+          7.916016580544749e-05,
+          0.008228445481841595
+        ]
+      },
+      "off_limit_contact_counts": {
+        "trial_1": 0,
+        "trial_2": 0,
+        "trial_3": 0
+      },
+      "report_path": "bag_analysis.json"
+    },
+    "lateral_bias_analysis": {
+      "candidate_env": {
+        "AIC_LEWM_FINAL_SERVO_DURATION_SEC": "0.75",
+        "AIC_LEWM_FINAL_SERVO_ENABLED": "1",
+        "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE": "delta",
+        "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "4",
+        "AIC_LEWM_SC_FINAL_SERVO_ANGULAR": "0,0,0",
+        "AIC_LEWM_SC_FINAL_SERVO_LINEAR": "0,0,0",
+        "AIC_LEWM_SFP_FINAL_SERVO_ANGULAR": "0,0,0",
+        "AIC_LEWM_SFP_FINAL_SERVO_LINEAR": "-0.01,0.02,-0.012"
+      },
+      "finding": "The delta force guard allowed final-servo motion, but SFP failures are dominated by lateral offset at/near the entrance, not lack of axial advance alone.",
+      "report_path": "lateral_bias_analysis.json",
+      "source_run_id": "gate2-20260422T212109Z-deltaguard"
+    },
+    "official_result_path": "artifacts/cloud-logs/gate2-20260422T230909Z-latbias/eval/scoring.yaml",
+    "participant_image": "aic-lewm-gate2:gate2-20260422T230909Z-latbias",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "replay_hz": 10.0,
+      "report_path": "replay_check.json",
+      "sc_effective_duration_sec": 2.75,
+      "sfp_final_servo_linear": [
+        -0.01,
+        0.02,
+        -0.012
+      ],
+      "sfp_final_servo_windows_sec": [
+        [
+          6.7,
+          7.45
+        ],
+        [
+          6.9,
+          7.65
+        ]
+      ]
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "9000",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_DEVICE": "cpu",
+      "AIC_LEWM_FINAL_SERVO_DURATION_SEC": "0.75",
+      "AIC_LEWM_FINAL_SERVO_ENABLED": "1",
+      "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE": "delta",
+      "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "4",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "7.7",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "10",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "0",
+      "AIC_LEWM_SC_FINAL_SERVO_ANGULAR": "0,0,0",
+      "AIC_LEWM_SC_FINAL_SERVO_LINEAR": "0,0,0",
+      "AIC_LEWM_SC_REPLAY_STOP_SEC": "2.75",
+      "AIC_LEWM_SFP_FINAL_SERVO_ANGULAR": "0,0,0",
+      "AIC_LEWM_SFP_FINAL_SERVO_LINEAR": "-0.01,0.02,-0.012"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/gate2-20260422T230909Z-latbias/eval/scoring.yaml",
+      "total": 128.00872420948235,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 22.576074905888063,
+          "tier_3": 25.0,
+          "total": 48.57607490588806
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 23.003591659767142,
+          "tier_3": 25.0,
+          "total": 49.00359165976714
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 22.81600910122913,
+          "tier_3": 6.613048542598012,
+          "total": 30.429057643827143
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "servo_events": {
+      "engaged": [
+        "Final insertion servo engaged: episode=0 port_type=sfp elapsed=6.75s duration=0.75s linear=(-0.01, 0.02, -0.012) angular=(0.0, 0.0, 0.0)",
+        "Final insertion servo engaged: episode=1 port_type=sfp elapsed=6.90s duration=0.75s linear=(-0.01, 0.02, -0.012) angular=(0.0, 0.0, 0.0)"
+      ],
+      "force_baseline": [
+        "Final insertion servo force baseline captured: force=(0.18, -5.95, 10.52)N",
+        "Final insertion servo force baseline captured: force=(-0.08, -9.97, 17.57)N"
+      ],
+      "force_guard": [
+        "Final insertion servo force guard engaged: mode=delta value=6.11N limit=4.00N"
+      ],
+      "sc_stop": [
+        "Replay safety stop engaged: episode=2 port_type=sc elapsed=2.75s stop_sec=2.75s"
+      ]
+    },
+    "trial_summary": {
+      "contact_detected": false,
+      "contact_messages": [],
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.02,
+      "trial_1_force_guard_tripped": true,
+      "trial_2_final_distance_m": 0.03,
+      "trial_2_force_guard_tripped": false,
+      "trial_3_final_distance_m": 0.13
+    }
+  },
+  "hypothesis": "If residual lateral offset is blocking near-port SFP insertion, a small -x/+y/-z final servo should improve final distance without off-limit contacts.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Lateral-bias candidate was derived from post-servo bag mining of gate2-20260422T212109Z-deltaguard.",
+    "Official scoring still reported no insertion on all three trials; final distances were 0.02m, 0.03m, and 0.13m.",
+    "Trial 1 tripped the delta final-servo guard at 6.11N and earned a transient insertion-force warning, though no penalty was applied.",
+    "Trial 2 did not trip the force guard, but final distance worsened from 0.02m to 0.03m versus the delta-guard candidate.",
+    "All three trials had zero off-limit contacts in official scoring and offline bag analysis."
+  ],
+  "promotion": {
+    "accepted": false,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-23T00:52:15Z",
+    "decision": "rejected",
+    "eligible_for_submission": false,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T230909Z-latbias/manifest.json",
+    "metric": {
+      "baseline_value": 127.78018667287431,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 128.00872420948235
+    },
+    "notes": [
+      "Promotion gate was run after official replay evaluation.",
+      "Rejected under the +1.0 margin and because Gate 2 did not gain insertion/contact credit.",
+      "This candidate is useful negative evidence: a fixed lateral-bias push can trigger force guarding and does not improve the official score."
+    ],
+    "reason": "128.00872420948235 < 127.78018667287431 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T230909Z-latbias",
+    "schema_version": 1
+  },
+  "run_id": "gate2-20260422T230909Z-latbias",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-23T00:52:43Z"
+}

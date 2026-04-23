@@ -1,0 +1,187 @@
+{
+  "attrs": {
+    "action_field_names": [
+      "linear.x",
+      "linear.y",
+      "linear.z",
+      "angular.x",
+      "angular.y",
+      "angular.z"
+    ],
+    "primary_pixels": "pixels",
+    "state_field_names": [
+      "tcp_pose.position.x",
+      "tcp_pose.position.y",
+      "tcp_pose.position.z",
+      "tcp_pose.orientation.x",
+      "tcp_pose.orientation.y",
+      "tcp_pose.orientation.z",
+      "tcp_pose.orientation.w",
+      "tcp_velocity.linear.x",
+      "tcp_velocity.linear.y",
+      "tcp_velocity.linear.z",
+      "tcp_velocity.angular.x",
+      "tcp_velocity.angular.y",
+      "tcp_velocity.angular.z",
+      "tcp_error.x",
+      "tcp_error.y",
+      "tcp_error.z",
+      "tcp_error.rx",
+      "tcp_error.ry",
+      "tcp_error.rz",
+      "wrist_wrench.force.x",
+      "wrist_wrench.force.y",
+      "wrist_wrench.force.z",
+      "wrist_wrench.torque.x",
+      "wrist_wrench.torque.y",
+      "wrist_wrench.torque.z",
+      "joint_positions.0",
+      "joint_positions.1",
+      "joint_positions.2",
+      "joint_positions.3",
+      "joint_positions.4",
+      "joint_positions.5",
+      "joint_positions.6"
+    ]
+  },
+  "datasets": {
+    "action": {
+      "dtype": "float32",
+      "shape": [
+        207,
+        6
+      ]
+    },
+    "ep_idx": {
+      "dtype": "int32",
+      "shape": [
+        207
+      ]
+    },
+    "ep_len": {
+      "dtype": "int32",
+      "shape": [
+        3
+      ]
+    },
+    "ep_offset": {
+      "dtype": "int64",
+      "shape": [
+        3
+      ]
+    },
+    "episode_idx": {
+      "dtype": "int32",
+      "shape": [
+        207
+      ]
+    },
+    "left_pixels": {
+      "dtype": "uint8",
+      "shape": [
+        207,
+        256,
+        288,
+        3
+      ]
+    },
+    "pixels": {
+      "dtype": "uint8",
+      "shape": [
+        207,
+        256,
+        288,
+        3
+      ]
+    },
+    "plug_type": {
+      "dtype": "object",
+      "shape": [
+        207
+      ]
+    },
+    "port_type": {
+      "dtype": "object",
+      "shape": [
+        207
+      ]
+    },
+    "proprio": {
+      "dtype": "float32",
+      "shape": [
+        207,
+        32
+      ]
+    },
+    "right_pixels": {
+      "dtype": "uint8",
+      "shape": [
+        207,
+        256,
+        288,
+        3
+      ]
+    },
+    "state": {
+      "dtype": "float32",
+      "shape": [
+        207,
+        32
+      ]
+    },
+    "step_idx": {
+      "dtype": "int32",
+      "shape": [
+        207
+      ]
+    },
+    "target_module_name": {
+      "dtype": "object",
+      "shape": [
+        207
+      ]
+    },
+    "task_id": {
+      "dtype": "object",
+      "shape": [
+        207
+      ]
+    }
+  },
+  "episode_count": 3,
+  "episode_lengths": [
+    67,
+    69,
+    71
+  ],
+  "episode_offsets": [
+    0,
+    67,
+    136
+  ],
+  "errors": [],
+  "ok": true,
+  "path": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+  "required_keys": [
+    "ep_len",
+    "ep_offset",
+    "ep_idx",
+    "episode_idx",
+    "step_idx",
+    "pixels",
+    "left_pixels",
+    "right_pixels",
+    "proprio",
+    "state",
+    "action",
+    "task_id",
+    "plug_type",
+    "port_type",
+    "target_module_name"
+  ],
+  "schema_version": 1,
+  "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+  "size_bytes": 23840392,
+  "step_count": 207,
+  "validated_at_utc": "2026-04-22T16:56:43Z"
+}

@@ -1,0 +1,47 @@
+{
+  "artifacts": [
+    {
+      "kind": "log",
+      "path": "artifacts/real-20260421T225940Z-aic-lewm-3trial-cpu-collect/eval.log",
+      "role": "aic_eval"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   5 ++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 676232 bytes\n pixi.toml                                   |   2 ++\n 5 files changed, 12 insertions(+), 3 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-21T23:00:04Z",
+  "dataset": {},
+  "description": "Harnessed real run using an n2-standard-16 CPU collector for the official three-trial RecordingCheatCode dataset, followed by LEWM training on the L4 runner if dataset validation passes.",
+  "evaluation": {
+    "failure": {
+      "exit_code": 125,
+      "reason": "CPU collector bootstrap and participant image build succeeded, but the collection wrapper did not forward AIC_DOCKER_GPUS=0 to the remote VM, so docker refused the model container with a GPU device-driver selection error."
+    }
+  },
+  "hypothesis": "Moving simulator-bound data collection to a larger CPU runner will avoid the g2-standard-4 entity-spawn race while preserving the L4 for training.",
+  "kind": "record_train",
+  "notes": [
+    "No HDF5 dataset was produced. This run exposed and fixed a wrapper contract bug; the next CPU run can reuse the built participant image and omit --gpus correctly."
+  ],
+  "promotion": {
+    "decision": "not_evaluated"
+  },
+  "run_id": "real-20260421T225940Z-aic-lewm-3trial-cpu-collect",
+  "schema_version": 1,
+  "status": "failed",
+  "training": {},
+  "updated_at_utc": "2026-04-21T23:18:35Z"
+}

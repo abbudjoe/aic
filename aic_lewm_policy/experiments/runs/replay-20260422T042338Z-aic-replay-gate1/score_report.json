@@ -1,0 +1,30 @@
+{
+  "parsed_at_utc": "2026-04-22T05:03:48Z",
+  "path": "artifacts/cloud-logs/replay-20260422T042338Z-aic-replay-gate1/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/cloud-logs/replay-20260422T042338Z-aic-replay-gate1/eval/scoring.yaml",
+    "total": 3.0,
+    "trial_count": 3,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 0.0,
+        "tier_3": 0.0,
+        "total": 1.0
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 0.0,
+        "tier_3": 0.0,
+        "total": 1.0
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 0.0,
+        "tier_3": 0.0,
+        "total": 1.0
+      }
+    }
+  }
+}

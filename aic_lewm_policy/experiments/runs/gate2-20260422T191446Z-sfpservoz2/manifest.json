@@ -1,0 +1,216 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/replay_check.json"
+    },
+    {
+      "kind": "bag_analysis",
+      "path": "bag_analysis.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/bag_analysis.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_2_perception_servo_attempt_3.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T191446Z-sfpservoz2/harness/gate_reviews/gate_2_perception_servo_attempt_3.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T21:03:40Z",
+  "dataset": {
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 2 candidate: add a guarded final-centimeter SFP insertion servo after 10Hz replay while keeping the SC 2.75s safety stop.",
+  "evaluation": {
+    "analysis": {
+      "baseline_total": 127.78018667287431,
+      "delta_vs_baseline": -0.48601250841019805,
+      "finding": "The guarded final SFP servo reduced score versus the SC-stop baseline and still produced no insertion; trial 2 was already above the force guard at servo start."
+    },
+    "bag_analysis": {
+      "off_limit_contact_counts": {
+        "trial_1": 0,
+        "trial_2": 0,
+        "trial_3": 0
+      },
+      "report_path": "bag_analysis.json"
+    },
+    "official_result_path": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval/scoring.yaml",
+    "participant_image": "aic-lewm-gate2:gate2-20260422T191446Z-sfpservoz2",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "replay_hz": 10.0,
+      "report_path": "replay_check.json",
+      "sc_effective_duration_sec": 2.75,
+      "sfp_final_servo_windows_sec": [
+        [
+          6.7,
+          7.95
+        ],
+        [
+          6.9,
+          8.15
+        ]
+      ]
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "9000",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_DEVICE": "cpu",
+      "AIC_LEWM_FINAL_SERVO_DURATION_SEC": "1.25",
+      "AIC_LEWM_FINAL_SERVO_ENABLED": "1",
+      "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "18",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "8.3",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "10",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "0",
+      "AIC_LEWM_SC_FINAL_SERVO_ANGULAR": "0,0,0",
+      "AIC_LEWM_SC_FINAL_SERVO_LINEAR": "0,0,0",
+      "AIC_LEWM_SC_REPLAY_STOP_SEC": "2.75",
+      "AIC_LEWM_SFP_FINAL_SERVO_ANGULAR": "0,0,0",
+      "AIC_LEWM_SFP_FINAL_SERVO_LINEAR": "0,0,-0.02"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval/scoring.yaml",
+      "total": 127.29417416446411,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 22.55494794897478,
+          "tier_3": 24.838344926359664,
+          "total": 48.393292875334446
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 22.748538394496396,
+          "tier_3": 25.0,
+          "total": 48.74853839449639
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 22.59660793559599,
+          "tier_3": 6.555734959037284,
+          "total": 30.152342894633275
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "servo_events": {
+      "engaged": [
+        "Final insertion servo engaged: episode=0 port_type=sfp elapsed=6.70s duration=1.25s linear=(0.0, 0.0, -0.02) angular=(0.0, 0.0, 0.0)"
+      ],
+      "force_guard": [
+        "Final insertion servo force guard engaged: force=20.77N limit=18.00N"
+      ],
+      "sc_stop": [
+        "Replay safety stop engaged: episode=2 port_type=sc elapsed=2.75s stop_sec=2.75s"
+      ]
+    },
+    "trial_summary": {
+      "contact_detected": false,
+      "contact_messages": [],
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.05,
+      "trial_2_final_distance_m": 0.02,
+      "trial_3_final_distance_m": 0.13
+    }
+  },
+  "hypothesis": "If the SFP trials are already within 0.02-0.05m, a small legal post-replay downward servo guarded by wrist force should earn insertion/contact credit without reintroducing off-limit contact.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Final SFP servo engaged on trial 1 after replay at 6.70s with linear=(0,0,-0.02).",
+    "Trial 2 hit the force guard at servo start (20.77N >= 18.00N), so the servo held rather than pushing further.",
+    "SC replay safety stop remained active at 2.75s and no SC final servo motion was configured.",
+    "Official scoring reported no off-limit contact and no insertion in all three trials."
+  ],
+  "promotion": {
+    "accepted": false,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T21:03:48Z",
+    "decision": "rejected",
+    "eligible_for_submission": false,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T191446Z-sfpservoz2/manifest.json",
+    "metric": {
+      "baseline_value": 127.78018667287431,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 127.29417416446411
+    },
+    "notes": [
+      "Promotion gate was run after official replay evaluation.",
+      "Expected rejection: the guarded SFP final servo underperformed the current SC-stop promoted baseline."
+    ],
+    "reason": "127.29417416446411 < 127.78018667287431 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T191446Z-sfpservoz2",
+    "schema_version": 1
+  },
+  "run_id": "gate2-20260422T191446Z-sfpservoz2",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T21:04:21Z"
+}

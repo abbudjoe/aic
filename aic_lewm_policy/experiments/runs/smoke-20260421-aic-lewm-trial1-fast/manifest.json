@@ -1,0 +1,146 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset",
+      "sha256": "d42bc43ea26419fbb092eb36bd74a3b0547239699a517996572073f04bccdf79",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/aic_qualification_train.h5"
+    },
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json"
+    },
+    {
+      "crc32c": "NV4A1w==",
+      "generation": "1776802404091185",
+      "kind": "checkpoint",
+      "md5": "q1rqpPu6x7oF0PhuJZ6SZA==",
+      "size_bytes": 216789865,
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/checkpoints/aic-lewm-trial1-fast/aic_lewm_weights.ckpt"
+    },
+    {
+      "crc32c": "EhQEVA==",
+      "generation": "1776802400449295",
+      "kind": "training_config",
+      "md5": "faHQtwXdZeRkO3MgE7sMlQ==",
+      "size_bytes": 1193,
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/checkpoints/aic-lewm-trial1-fast/config.yaml"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "dirty": true,
+    "note": "Backfilled after the run. The run used local uncommitted AIC LEWM integration and cloud launcher changes.",
+    "run_relevant_changes": [
+      "aic_lewm_policy/aic_lewm_policy/RecordingCheatCode.py",
+      "aic_lewm_policy/cloud/gcp/vm_train_aic_lewm.sh",
+      "aic_lewm_policy/cloud/gcp/run_training.sh",
+      "docker/aic_lewm_policy/Dockerfile",
+      "docker/docker-compose.yaml",
+      "pixi.toml"
+    ]
+  },
+  "collection": {
+    "eval_image": "ghcr.io/intrinsic-dev/aic/aic_eval:latest",
+    "participant_image": "aic-lewm-recording:v1",
+    "policy": "aic_lewm_policy.RecordingCheatCode",
+    "runtime_env": {
+      "AIC_LEWM_CHEATCODE_APPROACH_SLEEP": "0.02",
+      "AIC_LEWM_CHEATCODE_APPROACH_STEPS": "40",
+      "AIC_LEWM_CHEATCODE_INSERT_SLEEP": "0.02",
+      "AIC_LEWM_CHEATCODE_INSERT_Z_STEP": "0.003",
+      "AIC_LEWM_CHEATCODE_STABILIZE_SLEEP": "1.0",
+      "AIC_LEWM_RECORD_FLUSH_EVERY": "10",
+      "AIC_LEWM_RECORD_HZ": "20",
+      "AIC_LEWM_RECORD_IMAGE_SCALE": "0.25"
+    },
+    "score": {
+      "source": "AIC engine score from the RecordingCheatCode data collection run",
+      "total": 97.819241
+    },
+    "warning": "This collection policy uses ground-truth TF and is not submission-eligible."
+  },
+  "created_at_utc": "2026-04-21T19:57:37Z",
+  "dataset": {
+    "content_md5": "TIK/IqSIGr9GBLqt+BZBOg==",
+    "crc32c": "Ceqrbg==",
+    "episode_count": 1,
+    "generation": "1776801457129574",
+    "report_path": "dataset_report.json",
+    "sha256": "d42bc43ea26419fbb092eb36bd74a3b0547239699a517996572073f04bccdf79",
+    "size_bytes": 7073944,
+    "step_count": 61,
+    "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/aic_qualification_train.h5",
+    "validation": {
+      "episode_lengths": [
+        61
+      ],
+      "ok": true,
+      "validated_at_utc": "2026-04-21T20:32:08Z"
+    }
+  },
+  "description": "First end-to-end smoke run: collect one ground-truth AIC rollout, upload HDF5, train LEWM for 100 epochs on one L4, and sync checkpoints to GCS.",
+  "evaluation": {
+    "limitations": [
+      "Score is from the ground-truth RecordingCheatCode collection policy, not from the learned LEWM policy.",
+      "Dataset contains one complete episode only.",
+      "Trained checkpoint has not yet been evaluated as an autonomous submission policy."
+    ],
+    "score": {
+      "scope": "single_trial_collection_smoke_score",
+      "source": "AIC engine score during data collection",
+      "total": 97.819241
+    }
+  },
+  "hypothesis": "The AIC LEWM integration can complete the full operational loop from rollout collection to HDF5 validation to cloud training and checkpoint sync.",
+  "kind": "smoke_train",
+  "notes": [
+    "This run establishes plumbing only. It should not be used as evidence that the learned policy solves qualification.",
+    "The trained checkpoint is useful as a serialization and training smoke artifact."
+  ],
+  "promotion": {
+    "decision": "bootstrap_smoke_baseline",
+    "eligible_for_submission": false,
+    "notes": [
+      "Allowed only as the initial empirical ledger baseline.",
+      "Future candidates must beat this recorded metric and also pass learned-policy evaluation before submission consideration."
+    ]
+  },
+  "run_id": "smoke-20260421-aic-lewm-trial1-fast",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {
+    "cloud": {
+      "accelerator": "NVIDIA_L4",
+      "instance": "aic-lewm-l4",
+      "machine_type": "g2-standard-16",
+      "project": "project-81f2add4-9e80-4335-bb6",
+      "zone": "us-west4-a"
+    },
+    "data_config": "aic",
+    "dependency_overrides": [
+      "datasets==2.21.0"
+    ],
+    "input_dataset_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/aic_qualification_train.h5",
+    "launcher": "aic_lewm_policy/cloud/gcp/vm_train_aic_lewm.sh",
+    "max_epochs": 100,
+    "output": {
+      "artifact_count": 102,
+      "checkpoint_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/checkpoints/aic-lewm-trial1-fast/aic_lewm_weights.ckpt",
+      "config_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/checkpoints/aic-lewm-trial1-fast/config.yaml",
+      "gcs_prefix": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/checkpoints/aic-lewm-trial1-fast/"
+    },
+    "run_name": "aic-lewm-trial1-fast",
+    "trainer": {
+      "accelerator": "gpu",
+      "batch_size": 64,
+      "devices": 1,
+      "stop_reason": "max_epochs=100 reached"
+    }
+  },
+  "updated_at_utc": "2026-04-21T20:32:08Z"
+}

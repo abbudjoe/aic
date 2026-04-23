@@ -1,0 +1,87 @@
+{
+  "contact_margin_sec": 0.25,
+  "eval_dir": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval",
+  "recommended_env": {},
+  "schema_version": 1,
+  "stop_step_sec": 0.05,
+  "trials": [
+    {
+      "controller_duration_sec": 8.228000000000002,
+      "controller_stamp_end_sec": 10.848,
+      "controller_stamp_start_sec": 2.62,
+      "controller_state_count": 4114,
+      "final_tcp_error": [
+        0.00018496484397678703,
+        -0.0052918898373501,
+        -0.09229356989531881
+      ],
+      "final_tcp_position": [
+        -0.38732996756027793,
+        0.22585177637963064,
+        0.23677082005310623
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval/bag_trial_1_20260422_213736_109/bag_trial_1_20260422_213736_109_0.mcap",
+      "pose_command_count": 36954,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_0",
+        "task_id": "task_1"
+      },
+      "trial": "trial_1"
+    },
+    {
+      "controller_duration_sec": 8.204,
+      "controller_stamp_end_sec": 21.898,
+      "controller_stamp_start_sec": 13.693999999999999,
+      "controller_state_count": 8202,
+      "final_tcp_error": [
+        -2.1888418101634333e-05,
+        -0.0003706522353445485,
+        0.007929076322185508
+      ],
+      "final_tcp_position": [
+        -0.3913467403755738,
+        0.27428111600435917,
+        0.1910071302916161
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval/bag_trial_2_20260422_220327_758/bag_trial_2_20260422_220327_758_0.mcap",
+      "pose_command_count": 77251,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_2"
+    },
+    {
+      "controller_duration_sec": 8.201999999999998,
+      "controller_stamp_end_sec": 32.998,
+      "controller_stamp_start_sec": 24.796,
+      "controller_state_count": 12303,
+      "final_tcp_error": [
+        -0.00020245582290534525,
+        6.272319078726163e-05,
+        0.008212633742847697
+      ],
+      "final_tcp_position": [
+        -0.5027372522324396,
+        0.30007348836883846,
+        0.16785979167949516
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T212109Z-deltaguard/eval/bag_trial_3_20260422_223018_596/bag_trial_3_20260422_223018_596_0.mcap",
+      "pose_command_count": 105299,
+      "task": {
+        "plug_type": "sc",
+        "port_type": "sc",
+        "target_module_name": "sc_port_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_3"
+    }
+  ]
+}

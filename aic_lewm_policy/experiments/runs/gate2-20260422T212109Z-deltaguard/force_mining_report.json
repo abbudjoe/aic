@@ -1,0 +1,40 @@
+{
+  "candidate_env": {
+    "AIC_LEWM_FINAL_SERVO_DURATION_SEC": "0.75",
+    "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE": "delta",
+    "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "4"
+  },
+  "finding": "The absolute force norm is high throughout the trial, so a final-servo force guard must be baseline-relative to avoid treating static load as new contact.",
+  "force_norm_at_servo_start": {
+    "elapsed_sec": 6.894,
+    "force": [
+      -0.2068844802135316,
+      -10.564659694167478,
+      17.88381410024414
+    ],
+    "force_norm": 20.772232485070333
+  },
+  "force_norm_max": 22.043120098686174,
+  "force_norm_min": 19.941151573357615,
+  "schema_version": 1,
+  "source_run_id": "gate2-20260422T191446Z-sfpservoz2",
+  "state_duration_sec": 9.202,
+  "tcp_state_at_servo_start": {
+    "elapsed_sec": 6.9,
+    "tcp_error": [
+      0.0002652538127879134,
+      -8.080105377478164e-05,
+      0.008309554670937053,
+      0.0003332491509356243,
+      0.0003070453248447051,
+      -0.0001875338330939767
+    ],
+    "tcp_position": [
+      -0.3914813390420831,
+      0.2734825923805597,
+      0.20554784550728838
+    ]
+  },
+  "trial": "trial_2",
+  "wrench_count": 920
+}

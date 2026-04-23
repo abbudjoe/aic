@@ -1,8 +1,19 @@
 # python artifacts
-__pycache__/
+**/__pycache__/
+**/.pytest_cache/
+*.py[cod]
 *.egg-info/
 build/
 files.txt
+
+# local cloud/run state
+aic_lewm_policy/cloud/gcp/.env
+aic_lewm_policy/runtime_artifacts/*
+!aic_lewm_policy/runtime_artifacts/.gitkeep
+artifacts/
+.codex/autoresearch/results/
+.codex/autoresearch/logs/
+.codex/autoresearch/worktrees/
 
 # pixi environments
 .pixi/*
@@ -15,4 +26,3 @@ aic_utils/aic_mujoco/mjcf/*.png
 
 # Ignore aic_isaac usd assets
 aic_utils/aic_isaac/aic_isaaclab/source/aic_task/aic_task/tasks/manager_based/aic_task/Intrinsic_assets/
-

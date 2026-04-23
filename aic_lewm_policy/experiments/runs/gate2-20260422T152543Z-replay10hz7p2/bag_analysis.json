@@ -1,0 +1,118 @@
+{
+  "contact_margin_sec": 0.25,
+  "eval_dir": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval",
+  "recommended_env": {
+    "AIC_LEWM_SC_REPLAY_STOP_SEC": "2.75"
+  },
+  "schema_version": 1,
+  "stop_step_sec": 0.05,
+  "trials": [
+    {
+      "controller_duration_sec": 8.23,
+      "controller_stamp_end_sec": 10.848,
+      "controller_stamp_start_sec": 2.618,
+      "controller_state_count": 4116,
+      "final_tcp_error": [
+        0.00022686378082281689,
+        -0.005319352812801437,
+        -0.08418030143923855
+      ],
+      "final_tcp_position": [
+        -0.38725019802815813,
+        0.22559555028457803,
+        0.23679660496178573
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval/bag_trial_1_20260422_154105_501/bag_trial_1_20260422_154105_501_0.mcap",
+      "pose_command_count": 35906,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_0",
+        "task_id": "task_1"
+      },
+      "trial": "trial_1"
+    },
+    {
+      "controller_duration_sec": 8.204,
+      "controller_stamp_end_sec": 21.898,
+      "controller_stamp_start_sec": 13.693999999999999,
+      "controller_state_count": 8200,
+      "final_tcp_error": [
+        0.00034192037265168285,
+        0.0004908589020560239,
+        0.008356874908528766
+      ],
+      "final_tcp_position": [
+        -0.3918461647482217,
+        0.27394588891869864,
+        0.2052467890870393
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval/bag_trial_2_20260422_160651_803/bag_trial_2_20260422_160651_803_0.mcap",
+      "pose_command_count": 75970,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_2"
+    },
+    {
+      "controller_duration_sec": 8.233999999999998,
+      "controller_stamp_end_sec": 33.998,
+      "controller_stamp_start_sec": 25.764,
+      "controller_state_count": 12347,
+      "final_tcp_error": [
+        -0.03355691140981454,
+        0.004036444123943328,
+        -0.23644246108334718
+      ],
+      "final_tcp_position": [
+        -0.533414403611835,
+        0.3919523318349304,
+        0.03963869281758228
+      ],
+      "first_off_limit_contact": {
+        "collision1": "ur5e::wrist_3_link::wrist_3_link_fixed_joint_lump__lens_collider_cylinder_collision_12",
+        "collision2": "enclosure::enclosure_link::v1015026001_collider_box",
+        "log_elapsed_sec": 430.461475211,
+        "log_time_ns": 1776876216459025830,
+        "nearest_command_angular": [
+          -0.11282221972942352,
+          -0.005885581020265818,
+          -0.022597558796405792
+        ],
+        "nearest_command_elapsed_sec": 2.904,
+        "nearest_command_linear": [
+          -0.06246296316385269,
+          0.05329834669828415,
+          -0.06142649054527283
+        ],
+        "nearest_controller_elapsed_sec": 3.0360000000000014,
+        "nearest_tcp_error": [
+          -0.005561207956116032,
+          -0.0003920904109023793,
+          -0.0008961146031800649
+        ],
+        "nearest_tcp_position": [
+          -0.5296071466547929,
+          0.38930153446223115,
+          0.04227869895317844
+        ],
+        "recommended_stop_sec": 2.75
+      },
+      "off_limit_contact_count": 76,
+      "path": "artifacts/cloud-logs/gate2-20260422T152543Z-replay10hz7p2/eval/bag_trial_3_20260422_163625_981/bag_trial_3_20260422_163625_981_0.mcap",
+      "pose_command_count": 98254,
+      "task": {
+        "plug_type": "sc",
+        "port_type": "sc",
+        "target_module_name": "sc_port_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_3"
+    }
+  ]
+}

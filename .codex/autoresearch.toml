@@ -1,0 +1,130 @@
+version = 1
+name = "aic-lewm-qualification-roadmap"
+
+[repo]
+root = "."
+entry_branch = "HEAD"
+
+[execution]
+isolation = "in_place"
+worktree_root = ".codex/autoresearch/worktrees"
+shared_paths = [
+  "aic_lewm_policy/runtime_artifacts",
+]
+exclude_paths = [
+  "artifacts",
+  ".codex/autoresearch/results",
+  ".codex/autoresearch/logs",
+]
+parallel_candidates = 1
+max_iterations = 1
+time_budget_minutes = 240.0
+cleanup_worktrees = true
+
+[environment]
+mode = "prebaked"
+python_executable = ".pixi/envs/default/bin/python"
+setup_commands = []
+required_binaries = ["bash", "git", "python3"]
+required_python_modules = ["h5py", "numpy", "pytest", "yaml"]
+verify_commands = [
+  "test \"$(git rev-parse --abbrev-ref HEAD)\" = HEAD",
+  "test -x .pixi/envs/default/bin/python",
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.roadmap_tracking validate-roadmap aic_lewm_policy/experiments/roadmap.json",
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.experiment_harness validate-manifest aic_lewm_policy/experiments/runs/replay-20260422T063538Z-gate1-sim2p5-full/manifest.json",
+]
+
+[mutation]
+allowed_paths = [
+  ".codex/autoresearch.toml",
+  "aic_lewm_policy/**",
+  "docker/aic_lewm_policy/**",
+]
+forbidden_paths = [
+  ".git/**",
+  "artifacts/**",
+  "aic_lewm_policy/runtime_artifacts/**",
+  "aic_lewm_policy/experiments/ledger.jsonl",
+  "aic_lewm_policy/experiments/baselines/current.json",
+]
+max_changed_files = 20
+
+[mutator]
+command = "python3 -c 'import json, os; open(os.environ[\"AUTORESEARCH_MUTATOR_OUTPUT_PATH\"], \"w\").write(json.dumps({\"env\": {}, \"metadata\": {\"mode\": \"manual-gated-roadmap\"}}))'"
+
+[baseline]
+commands = [
+  "mkdir -p .codex/autoresearch/results",
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.experiment_harness summarize-ledger --json > .codex/autoresearch/results/baseline_ledger_summary.json",
+]
+
+[baseline.metric]
+kind = "json_file"
+path = "aic_lewm_policy/experiments/baselines/current.json"
+key = "metric.value"
+goal = "maximize"
+
+[evaluation.fast]
+commands = [
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m pytest aic_lewm_policy/test/test_eval_startup_contract.py aic_lewm_policy/test/test_replay_planner.py aic_lewm_policy/test/test_roadmap_tracking.py aic_lewm_policy/test/test_policy_wall_clock.py",
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.replay_policy_check --dataset aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5 --output .codex/autoresearch/results/fast_replay.json --overwrite > .codex/autoresearch/results/fast_replay.log",
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.roadmap_tracking validate-roadmap aic_lewm_policy/experiments/roadmap.json > .codex/autoresearch/results/fast_roadmap.json",
+]
+
+[evaluation.fast.metric]
+kind = "json_file"
+path = ".codex/autoresearch/results/fast_roadmap.json"
+key = "gate_count"
+goal = "maximize"
+
+[evaluation.promote]
+commands = [
+  "KMP_DUPLICATE_LIB_OK=TRUE PYTHONPATH=aic_lewm_policy .pixi/envs/default/bin/python -m aic_lewm_policy.experiment_harness promote aic_lewm_policy/experiments/runs/<run_id>/manifest.json --min-improvement 1.0",
+]
+
+[evaluation.promote.metric]
+kind = "json_file"
+path = "aic_lewm_policy/experiments/runs/<run_id>/score_report.json"
+key = "score.total"
+goal = "maximize"
+
+[[evaluation.promote.constraints]]
+name = "submission_eligible"
+kind = "json_file"
+path = "aic_lewm_policy/experiments/runs/<run_id>/manifest.json"
+key = "promotion.eligible_for_submission"
+operator = "=="
+value = true
+
+[selection]
+source_stage = "promote"
+min_improvement = 1.0
+reruns_for_acceptance = 1
+aggregation = "best"
+
+[ledger]
+path = "aic_lewm_policy/experiments/ledger.jsonl"
+stdout_tail_lines = 80
+
+[research]
+objective = "Maximize official AIC qualification score with a submission-eligible policy, climbing from replay to perception servo to LEWM critic/core only when gates justify it."
+focus = [
+  "official-interface-only policy behavior",
+  "replay and visual-servo control primitives",
+  "LEWM critic over meaningful motion primitives",
+  "harnessed official scoring runs",
+]
+avoid = [
+  "eval-time ground-truth TF",
+  "Gazebo/scoring namespace access",
+  "raw LEWM velocity MPC without a stronger control prior",
+  "untracked cloud experiments",
+]
+
+[artifacts]
+preserve = [
+  ".codex/autoresearch/results/**",
+  "aic_lewm_policy/experiments/roadmap.json",
+  "aic_lewm_policy/experiments/gate_reviews/**",
+  "aic_lewm_policy/experiments/runs/**",
+]

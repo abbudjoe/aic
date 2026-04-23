@@ -1,0 +1,24 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-23T00:52:15Z",
+  "decision": "rejected",
+  "eligible_for_submission": false,
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T230909Z-latbias/manifest.json",
+  "metric": {
+    "baseline_value": 127.78018667287431,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 128.00872420948235
+  },
+  "notes": [
+    "Promotion gate was run after official replay evaluation.",
+    "Rejected under the +1.0 margin and because Gate 2 did not gain insertion/contact credit.",
+    "This candidate is useful negative evidence: a fixed lateral-bias push can trigger force guarding and does not improve the official score."
+  ],
+  "reason": "128.00872420948235 < 127.78018667287431 + 1.0",
+  "report_path": "promotion_report.json",
+  "run_id": "gate2-20260422T230909Z-latbias",
+  "schema_version": 1
+}

@@ -1,0 +1,56 @@
+{
+  "artifacts": [
+    {
+      "kind": "log",
+      "path": "artifacts/real-20260421T212834Z-aic-lewm-3trial-train/eval.log",
+      "role": "aic_eval"
+    },
+    {
+      "kind": "log",
+      "path": "artifacts/real-20260421T212834Z-aic-lewm-3trial-train/model.log",
+      "role": "aic_model"
+    },
+    {
+      "kind": "text",
+      "path": "artifacts/real-20260421T212834Z-aic-lewm-3trial-train/eval_exit_code.txt",
+      "role": "eval_exit_code"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                 |   5 ++++-\n docker/docker-compose.yaml |   4 ++--\n pixi.lock                  | Bin 669641 -> 676232 bytes\n pixi.toml                  |   2 ++\n 4 files changed, 8 insertions(+), 3 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-21T21:31:57Z",
+  "dataset": {},
+  "description": "Harnessed real run: collect the official three-trial RecordingCheatCode dataset, validate and upload it to a unique GCS URI, train LEWM, and record all artifacts.",
+  "evaluation": {
+    "failure": {
+      "exit_code": 137,
+      "reason": "Stopped after evaluator launch hit a controller spawner timeout race: aic_controller load exceeded the default 10s service-call timeout and the retry observed the controller already loaded."
+    }
+  },
+  "hypothesis": "A complete three-trial AIC rollout dataset improves the empirical footing over the one-episode smoke run and can be trained reproducibly under the harness.",
+  "kind": "record_train",
+  "notes": [
+    "No dataset was produced. Logs were preserved before applying the controller spawner timeout fix."
+  ],
+  "promotion": {
+    "decision": "not_evaluated"
+  },
+  "run_id": "real-20260421T212834Z-aic-lewm-3trial-train",
+  "schema_version": 1,
+  "status": "failed",
+  "training": {},
+  "updated_at_utc": "2026-04-21T22:07:10Z"
+}

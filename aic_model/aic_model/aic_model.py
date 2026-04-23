@@ -79,8 +79,10 @@ class AicModel(LifecycleNode):
             raise LookupError(expected_policy_class_name)
 
         self._tf_buffer = Buffer()
+        # Keep all callbacks on the lifecycle node's executor; a hidden TF
+        # spin thread can delay model discovery before the node is added.
         self._tf_listener = TransformListener(
-            buffer=self._tf_buffer, node=self, spin_thread=True
+            buffer=self._tf_buffer, node=self, spin_thread=False
         )
 
         self.cancel_service = self.create_service(

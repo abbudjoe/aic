@@ -1,0 +1,87 @@
+{
+  "contact_margin_sec": 0.25,
+  "eval_dir": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval",
+  "recommended_env": {},
+  "schema_version": 1,
+  "stop_step_sec": 0.05,
+  "trials": [
+    {
+      "controller_duration_sec": 9.216000000000001,
+      "controller_stamp_end_sec": 11.848,
+      "controller_stamp_start_sec": 2.632,
+      "controller_state_count": 4609,
+      "final_tcp_error": [
+        0.0002406238776814229,
+        -0.004731273066087505,
+        -0.098189161002565
+      ],
+      "final_tcp_position": [
+        -0.38774445757825066,
+        0.22533186053064563,
+        0.2368300900899922
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval/bag_trial_1_20260422_193944_995/bag_trial_1_20260422_193944_995_0.mcap",
+      "pose_command_count": 22444,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_0",
+        "task_id": "task_1"
+      },
+      "trial": "trial_1"
+    },
+    {
+      "controller_duration_sec": 9.202,
+      "controller_stamp_end_sec": 23.898,
+      "controller_stamp_start_sec": 14.696,
+      "controller_state_count": 9201,
+      "final_tcp_error": [
+        0.0002621654729202394,
+        0.0006194174033056776,
+        0.008364542462233199
+      ],
+      "final_tcp_position": [
+        -0.39147760431340833,
+        0.2727838783071097,
+        0.2054914102991496
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval/bag_trial_2_20260422_200748_350/bag_trial_2_20260422_200748_350_0.mcap",
+      "pose_command_count": 47678,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_2"
+    },
+    {
+      "controller_duration_sec": 9.199999999999996,
+      "controller_stamp_end_sec": 35.998,
+      "controller_stamp_start_sec": 26.798000000000002,
+      "controller_state_count": 13801,
+      "final_tcp_error": [
+        -0.00019431153347104768,
+        0.0001145599920745477,
+        0.008286284617319312
+      ],
+      "final_tcp_position": [
+        -0.503019053944354,
+        0.2999991960989681,
+        0.16790041102545672
+      ],
+      "off_limit_contact_count": 0,
+      "path": "artifacts/cloud-logs/gate2-20260422T191446Z-sfpservoz2/eval/bag_trial_3_20260422_203658_559/bag_trial_3_20260422_203658_559_0.mcap",
+      "pose_command_count": 65403,
+      "task": {
+        "plug_type": "sc",
+        "port_type": "sc",
+        "target_module_name": "sc_port_1",
+        "task_id": "task_1"
+      },
+      "trial": "trial_3"
+    }
+  ]
+}

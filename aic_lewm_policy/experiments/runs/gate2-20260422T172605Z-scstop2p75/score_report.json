@@ -1,0 +1,30 @@
+{
+  "parsed_at_utc": "2026-04-22T18:56:12Z",
+  "path": "artifacts/cloud-logs/gate2-20260422T172605Z-scstop2p75/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/cloud-logs/gate2-20260422T172605Z-scstop2p75/eval/scoring.yaml",
+    "total": 127.78018667287431,
+    "trial_count": 3,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 22.78707284839006,
+        "tier_3": 24.849553734812446,
+        "total": 48.636626583202506
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 22.965941415613017,
+        "tier_3": 25.0,
+        "total": 48.96594141561302
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 22.803774006388206,
+        "tier_3": 6.373844667670585,
+        "total": 30.17761867405879
+      }
+    }
+  }
+}

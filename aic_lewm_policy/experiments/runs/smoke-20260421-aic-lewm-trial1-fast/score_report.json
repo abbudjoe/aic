@@ -1,0 +1,19 @@
+{
+  "parsed_at_utc": "2026-04-21T20:33:08Z",
+  "path": null,
+  "schema_version": 1,
+  "score": {
+    "scope": "single_trial_collection_smoke_score",
+    "source": "Backfilled from AIC engine output during RecordingCheatCode data collection",
+    "total": 97.819241,
+    "trial_count": 1,
+    "trials": {
+      "trial_1": {
+        "tier_1": null,
+        "tier_2": null,
+        "tier_3": null,
+        "total": 97.819241
+      }
+    }
+  }
+}

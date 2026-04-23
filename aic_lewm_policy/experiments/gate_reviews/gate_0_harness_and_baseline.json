@@ -1,0 +1,16 @@
+{
+  "decision": "proceed",
+  "evidence": [
+    "The experiment harness validates datasets, manifests, score reports, promotion decisions, and the JSONL ledger.",
+    "The first autonomous learned-policy eval, learned-20260422T030153Z-aic-lewm-policy-l4-fast, completed all lifecycle/scoring steps but scored 3.0 total.",
+    "The 257.2016105939469 collection score is explicitly recorded as RecordingCheatCode data collection and not submission-eligible."
+  ],
+  "gate_id": "gate_0_harness_and_baseline",
+  "next_requirements": [
+    "Implement Gate 1 replay through only official task metadata and observations.",
+    "Run an official scored eval for replay before attempting perception servo work.",
+    "If replay does not earn Tier 3 proximity credit, inspect logs/bags to decide whether the next correction is command-frame/action-scale tuning or visual alignment."
+  ],
+  "reviewed_at_utc": "2026-04-22T00:00:00Z",
+  "schema_version": 1
+}

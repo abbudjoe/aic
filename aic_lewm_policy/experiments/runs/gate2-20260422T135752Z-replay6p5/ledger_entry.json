@@ -1,0 +1,49 @@
+{
+  "dataset": {
+    "episode_count": 3,
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5"
+  },
+  "git_commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+  "git_dirty": true,
+  "kind": "replay_policy_eval",
+  "manifest_path": "runs/gate2-20260422T135752Z-replay6p5/manifest.json",
+  "metric": {
+    "goal": "max",
+    "name": "evaluation.score.total",
+    "value": 122.39001511101944
+  },
+  "promotion": {
+    "accepted": true,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T15:23:52Z",
+    "decision": "accepted",
+    "eligible_for_submission": true,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T135752Z-replay6p5/manifest.json",
+    "metric": {
+      "baseline_value": 106.5764522524607,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 122.39001511101944
+    },
+    "notes": [
+      "Promotion gate accepted this horizon ablation as the current empirical baseline.",
+      "Accepted as a score baseline only; Gate 2 remains open because no contact or insertion was detected."
+    ],
+    "reason": "122.39001511101944 >= 106.5764522524607 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T135752Z-replay6p5",
+    "schema_version": 1
+  },
+  "recorded_at_utc": "2026-04-22T15:24:26Z",
+  "run_id": "gate2-20260422T135752Z-replay6p5",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {
+    "checkpoint_uri": null,
+    "max_epochs": null,
+    "run_name": null
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "Implemented baseline-relative delta force guarding with env propagation, replay-policy checks, and regression tests.",
+    "Official run gate2-20260422T212109Z-deltaguard scored 128.017218 total versus the promoted 127.780187 SC-stop baseline, a +0.237031 gain below the +1.0 promotion margin.",
+    "Trial scores were 48.616924, 49.006153, and 30.394140.",
+    "The delta force guard captured static wrist-load baselines on both SFP trials and allowed the SFP final servo to run without tripping on the 20.77N trial-2 preload.",
+    "Official scoring and offline bag analysis reported zero off-limit contacts on all three trials.",
+    "No insertion was detected; final distances were 0.05m, 0.02m, and 0.13m."
+  ],
+  "gate_id": "gate_2_perception_servo",
+  "next_requirements": [
+    "Keep the delta force guard as the final-servo safety contract, but do not promote fixed downward push as Gate 2 done.",
+    "Mine the trial-2 post-servo bag segment to explain why 0.02m final distance still produced no insertion credit.",
+    "Replace constant world-z push with an insertion primitive that can act along the episode-specific insertion axis and choose hold, retract, micro-advance, or dither based on legal observations and force deltas.",
+    "Add offline acceptance checks for insertion-relevant motion or contact-state changes before another official run.",
+    "Gate 2 remains open until official evidence shows insertion/contact credit or a stronger legal final-centimeter improvement beyond proximity alone."
+  ],
+  "reviewed_at_utc": "2026-04-22T22:56:03Z",
+  "run_id": "gate2-20260422T212109Z-deltaguard",
+  "schema_version": 1
+}

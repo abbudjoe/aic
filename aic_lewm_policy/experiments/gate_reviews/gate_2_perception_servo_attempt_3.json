@@ -1,0 +1,22 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "Implemented a typed final-servo control surface with env propagation, replay-policy checks, and regression tests.",
+    "Official run gate2-20260422T191446Z-sfpservoz2 scored 127.294174 total versus the promoted 127.780187 SC-stop baseline, so the promotion gate rejected it.",
+    "Trial scores were 48.393293, 48.748538, and 30.152343.",
+    "The SFP final servo engaged on trial 1, but trial 2 hit the 18N force guard at 20.77N before servo motion could push further.",
+    "Official scoring and offline bag analysis reported zero off-limit contacts on all three trials.",
+    "No insertion was detected; final distances were 0.05m, 0.02m, and 0.13m."
+  ],
+  "gate_id": "gate_2_perception_servo",
+  "next_requirements": [
+    "Do not promote constant downward final-servo motion; keep gate2-20260422T172605Z-scstop2p75 as the active score baseline.",
+    "Replace the fixed post-replay push with a force-aware contact/insertion primitive that can decide when to hold, retract, micro-advance, or wiggle based on legal observations.",
+    "Mine the trial-2 bag around the 20.77N force guard and final 0.02m distance to infer the missing insertion condition before another official run.",
+    "Add offline acceptance checks for the next primitive that verify zero off-limit contacts, bounded wrist force, and a concrete expected Tier 3 improvement.",
+    "Gate 2 remains open until official evidence shows insertion/contact credit or a stronger legal final-alignment improvement."
+  ],
+  "reviewed_at_utc": "2026-04-22T21:04:21Z",
+  "run_id": "gate2-20260422T191446Z-sfpservoz2",
+  "schema_version": 1
+}

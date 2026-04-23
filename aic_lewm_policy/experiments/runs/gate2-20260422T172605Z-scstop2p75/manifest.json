@@ -1,0 +1,188 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/replay_check.json"
+    },
+    {
+      "kind": "bag_analysis",
+      "path": "bag_analysis.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/bag_analysis.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/gate2-20260422T172605Z-scstop2p75",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_2_perception_servo_attempt_2.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/gate2-20260422T172605Z-scstop2p75/harness/gate_reviews/gate_2_perception_servo_attempt_2.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T18:57:57Z",
+  "dataset": {
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 2 candidate: keep 10Hz full-horizon replay for SFP trials and apply a conservative 2.75s SC replay safety stop derived from the previous off-limit contact bag.",
+  "evaluation": {
+    "analysis": {
+      "baseline_total": 122.39001511101944,
+      "delta_vs_baseline": 5.390171561854871,
+      "finding": "The SC stop removed the enclosure contact penalty and promoted the score baseline, but no insertion was detected and SC final distance remained 0.14m."
+    },
+    "bag_analysis": {
+      "off_limit_contact_counts": {
+        "trial_1": 0,
+        "trial_2": 0,
+        "trial_3": 0
+      },
+      "report_path": "bag_analysis.json"
+    },
+    "official_result_path": "artifacts/cloud-logs/gate2-20260422T172605Z-scstop2p75/eval/scoring.yaml",
+    "participant_image": "aic-lewm-gate2:gate2-20260422T172605Z-scstop2p75",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "replay_hz": 10.0,
+      "report_path": "replay_check.json",
+      "sc_effective_duration_sec": 2.75
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "9000",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_DEVICE": "cpu",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "7.2",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "10",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "0",
+      "AIC_LEWM_SC_REPLAY_STOP_SEC": "2.75"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/gate2-20260422T172605Z-scstop2p75/eval/scoring.yaml",
+      "total": 127.78018667287431,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 22.78707284839006,
+          "tier_3": 24.849553734812446,
+          "total": 48.636626583202506
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 22.965941415613017,
+          "tier_3": 25.0,
+          "total": 48.96594141561302
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 22.803774006388206,
+          "tier_3": 6.373844667670585,
+          "total": 30.17761867405879
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "trial_summary": {
+      "contact_detected": false,
+      "contact_messages": [],
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.05,
+      "trial_2_final_distance_m": 0.02,
+      "trial_3_final_distance_m": 0.14
+    }
+  },
+  "hypothesis": "If the 10Hz candidate failed because SC replay drove into the enclosure after about 3.04s, stopping SC replay at 2.75s should remove the contact penalty while preserving the improved SFP trials.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Offline bag analysis from gate2-20260422T152543Z-replay10hz7p2 found first SC enclosure contact at 3.036s controller elapsed and recommended a 2.75s stop.",
+    "This run engaged the replay safety stop at elapsed=2.75s on the SC trial.",
+    "All official scoring contact categories report no contact detected.",
+    "Trial 2 reached 0.02m final distance, but no insertion was detected in any trial."
+  ],
+  "promotion": {
+    "accepted": true,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T18:57:57Z",
+    "decision": "accepted",
+    "eligible_for_submission": true,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T172605Z-scstop2p75/manifest.json",
+    "metric": {
+      "baseline_value": 122.39001511101944,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 127.78018667287431
+    },
+    "notes": [
+      "Promotion gate was run after official replay evaluation.",
+      "Accepted as a score baseline only; Gate 2 remains open because no insertion/contact credit was earned."
+    ],
+    "reason": "127.78018667287431 >= 122.39001511101944 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T172605Z-scstop2p75",
+    "schema_version": 1
+  },
+  "run_id": "gate2-20260422T172605Z-scstop2p75",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T18:58:19Z"
+}

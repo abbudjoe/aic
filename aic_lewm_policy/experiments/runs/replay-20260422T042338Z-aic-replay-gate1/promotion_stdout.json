@@ -1,0 +1,17 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T05:05:20Z",
+  "manifest_path": "aic_lewm_policy/experiments/runs/replay-20260422T042338Z-aic-replay-gate1/manifest.json",
+  "metric": {
+    "baseline_value": 97.819241,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 3.0
+  },
+  "notes": [],
+  "reason": "3.0 >= 97.819241 + 1.0",
+  "run_id": "replay-20260422T042338Z-aic-replay-gate1",
+  "schema_version": 1
+}

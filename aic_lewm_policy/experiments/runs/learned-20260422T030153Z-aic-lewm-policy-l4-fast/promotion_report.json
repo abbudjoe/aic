@@ -1,0 +1,17 @@
+{
+  "accepted": false,
+  "checkpoint_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_weights.ckpt",
+  "decided_at_utc": "2026-04-22T03:45:32Z",
+  "manifest_path": "aic_lewm_policy/experiments/runs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/manifest.json",
+  "metric": {
+    "baseline_value": 97.819241,
+    "goal": "max",
+    "min_improvement": 0.0,
+    "name": "evaluation.score.total",
+    "value": 3.0
+  },
+  "notes": [],
+  "reason": "3.0 >= 97.819241 + 0.0",
+  "run_id": "learned-20260422T030153Z-aic-lewm-policy-l4-fast",
+  "schema_version": 1
+}

@@ -1,0 +1,174 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/replay_check.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/replay-20260422T063538Z-gate1-sim2p5-full",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_1_replay_baseline_attempt_2.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/gate_reviews/gate_1_replay_baseline_attempt_2.json"
+    },
+    {
+      "kind": "ledger",
+      "path": "aic_lewm_policy/experiments/ledger.jsonl",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/ledger.jsonl"
+    },
+    {
+      "kind": "current_baseline",
+      "path": "aic_lewm_policy/experiments/baselines/current.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T063538Z-gate1-sim2p5-full/harness/baselines/current.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T07:22:21Z",
+  "dataset": {
+    "episode_count": 3,
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 1 replay baseline with ROS-observation-time action indexing, short simulated replay horizon, and short Docker router aliases for reliable official evaluation.",
+  "evaluation": {
+    "control_plane_fixes": {
+      "docker_dns_alias": "GCP eval wrapper uses a short hashed Docker alias while preserving full run ids in result paths.",
+      "lifecycle_tf_executor": "aic_model TF listener stays on the lifecycle node executor instead of a hidden pre-discovery spin thread.",
+      "policy_timebase": "Planner action selection uses observation/ROS time; wall time is only a throttle."
+    },
+    "official_result_path": "artifacts/cloud-logs/replay-20260422T063538Z-gate1-sim2p5-full/eval/scoring.yaml",
+    "participant_image": "aic-lewm-replay:replay-20260422T060343Z-aic-replay-rostime-wallthrottle-startup-entrypointfix-gate1",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "report_path": "replay_check.json"
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "5400",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "2.5",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "20",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/replay-20260422T063538Z-gate1-sim2p5-full/eval/scoring.yaml",
+      "total": 106.5764522524607,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 23.254975737006358,
+          "tier_3": 14.305633264229828,
+          "total": 38.56060900123619
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 23.33080444997813,
+          "tier_3": 14.855946124801056,
+          "total": 39.18675057477919
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 23.208354638372644,
+          "tier_3": 4.620738038072693,
+          "total": 28.829092676445335
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "trial_summary": {
+      "contact_detected": false,
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.07,
+      "trial_2_final_distance_m": 0.07,
+      "trial_3_final_distance_m": 0.15
+    }
+  },
+  "hypothesis": "Observation-time-indexed replay with a 2.5 simulated-second horizon should recover legal Tier 2/Tier 3 proximity credit while avoiding the wall-clock trajectory burn that scored only 3.0.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Official three-trial eval completed with nonzero Tier 2/Tier 3 credit on all trials.",
+    "The 2.5 simulated-second replay horizon avoids the old wall-clock trajectory burn and raises total score from 3.0 to 106.576452.",
+    "No insertion or contact was detected; final distances remain 0.07m, 0.07m, and 0.15m, so Gate 1 still needs closed-loop alignment/insertion control before advancing.",
+    "No eval-time ground-truth TF or Gazebo/scoring namespace access was used by the replay planner."
+  ],
+  "promotion": {
+    "accepted": true,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T07:23:04Z",
+    "decision": "accepted",
+    "eligible_for_submission": true,
+    "manifest_path": "aic_lewm_policy/experiments/runs/replay-20260422T063538Z-gate1-sim2p5-full/manifest.json",
+    "metric": {
+      "baseline_value": 97.819241,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 106.5764522524607
+    },
+    "notes": [
+      "Promotion gate accepted this official submission-eligible replay evaluation over the previous harness baseline.",
+      "Accepted as the current empirical baseline, not as Gate 1 completion; no insertion/contact credit was earned."
+    ],
+    "reason": "106.5764522524607 >= 97.819241 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "replay-20260422T063538Z-gate1-sim2p5-full",
+    "schema_version": 1
+  },
+  "run_id": "replay-20260422T063538Z-gate1-sim2p5-full",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T07:26:26Z"
+}

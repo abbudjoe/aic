@@ -1,0 +1,20 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-23T00:52:15Z",
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T230909Z-latbias/manifest.json",
+  "metric": {
+    "baseline_value": 127.78018667287431,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 128.00872420948235
+  },
+  "notes": [
+    "Promotion gate should reject this run under the +1.0 score margin.",
+    "Gate 2 also remains open because the candidate did not produce insertion/contact credit."
+  ],
+  "reason": "128.00872420948235 < 127.78018667287431 + 1.0",
+  "run_id": "gate2-20260422T230909Z-latbias",
+  "schema_version": 1
+}

@@ -1,0 +1,275 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5",
+      "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+      "size_bytes": 23840392,
+      "content_md5": "C1P3fF+PU//mNKAnOZTPcw==",
+      "crc32c": "wcNYXw==",
+      "generation": "1776816999017495"
+    },
+    {
+      "kind": "goal_dataset_runtime_copy",
+      "path": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+      "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+      "size_bytes": 23840392
+    },
+    {
+      "kind": "training_checkpoint",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_weights.ckpt",
+      "size_bytes": 216789929,
+      "content_md5": "kbPwIbVaetTMPgLT+vOaNA==",
+      "crc32c": "PjiejA==",
+      "generation": "1776818224770045"
+    },
+    {
+      "kind": "runtime_object_checkpoint",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_epoch_100_object.ckpt",
+      "path": "aic_lewm_policy/runtime_artifacts/aic_lewm_epoch_100_object.ckpt",
+      "sha256": "3d49d947f5ba6dd93fd0510ac40daa1eef9d3b89a1692982bbbc0006afaebd26",
+      "size_bytes": 72353051,
+      "content_md5": "N+Qvy5USrDhF8PzMIjbZpw==",
+      "crc32c": "4PCQIg==",
+      "generation": "1776818221776447"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json"
+    },
+    {
+      "kind": "learned_eval_scoring_yaml",
+      "path": "artifacts/cloud-logs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/scoring.yaml",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/eval/scoring.yaml",
+      "sha256": "64e5594ecff3b62f50fb102bece5c1afd1567329930ab0c557dc679db904d025",
+      "size_bytes": 2474,
+      "content_md5": "W0lmJW/HZNif7uwz+0Gkmw==",
+      "crc32c": "O0qtbw==",
+      "generation": "1776829335200036"
+    },
+    {
+      "kind": "learned_eval_bundle",
+      "path": "artifacts/cloud-logs/learned-20260422T030153Z-aic-lewm-policy-l4-fast",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/"
+    },
+    {
+      "kind": "learned_eval_model_log",
+      "path": "artifacts/cloud-logs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/model.log",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/model.log",
+      "size_bytes": 28069
+    },
+    {
+      "kind": "learned_eval_eval_log",
+      "path": "artifacts/cloud-logs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval.log",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/eval.log",
+      "size_bytes": 72478
+    },
+    {
+      "kind": "learned_eval_env",
+      "path": "artifacts/learned-20260422T030153Z-aic-lewm-policy-l4-fast.gcp.env"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 5 files changed, 15 insertions(+), 3 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ],
+    "note": "Run used local uncommitted AIC LEWM policy/runtime integration, source-correct Docker packaging, wall-clock policy deadline fix, and fast learned-MPC runtime budget.",
+    "run_relevant_changes": [
+      "aic_lewm_policy/aic_lewm_policy/LewmMpcPolicy.py",
+      "aic_lewm_policy/aic_lewm_policy/lewm_mpc.py",
+      "aic_lewm_policy/aic_lewm_policy/planners.py",
+      "aic_lewm_policy/aic_lewm_policy/schemas.py",
+      "aic_lewm_policy/aic_lewm_policy/offline_policy_check.py",
+      "aic_lewm_policy/cloud/gcp/run_learned_eval.sh",
+      "aic_lewm_policy/cloud/gcp/vm_eval_learned_policy.sh",
+      "aic_lewm_policy/test/test_policy_wall_clock.py",
+      "aic_lewm_policy/test/test_lewm_mpc.py",
+      "docker/aic_lewm_policy/Dockerfile",
+      "pixi.toml",
+      "pixi.lock"
+    ]
+  },
+  "created_at_utc": "2026-04-22T03:42:00Z",
+  "dataset": {
+    "content_md5": "C1P3fF+PU//mNKAnOZTPcw==",
+    "crc32c": "wcNYXw==",
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "episode_offsets": [
+      0,
+      67,
+      136
+    ],
+    "generation": "1776816999017495",
+    "report_path": "dataset_report.json",
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "size_bytes": 23840392,
+    "step_count": 207,
+    "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5",
+    "validation": {
+      "episode_lengths": [
+        67,
+        69,
+        71
+      ],
+      "ok": true,
+      "validated_at_utc": "2026-04-22T00:16:34Z"
+    }
+  },
+  "description": "Official three-trial learned LEWM policy evaluation on the L4 runner using the trained three-trial checkpoint, source-correct Docker packaging, wall-clock action deadline, and fast 4-candidate horizon-1 MPC budget.",
+  "evaluation": {
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "learned_policy": true,
+    "eval_image": "ghcr.io/intrinsic-dev/aic/aic_eval:latest",
+    "participant_image": "aic-lewm-learned:learned-20260422T030153Z-aic-lewm-policy-l4-fast",
+    "eval_exit_code": 0,
+    "score": {
+      "scope": "three_trial_learned_policy_official_eval",
+      "source": "artifacts/cloud-logs/learned-20260422T030153Z-aic-lewm-policy-l4-fast/eval/scoring.yaml",
+      "total": 3.0,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        }
+      }
+    },
+    "cloud": {
+      "project": "project-81f2add4-9e80-4335-bb6",
+      "zone": "us-west4-a",
+      "instance": "aic-lewm-l4",
+      "machine_type": "g2-standard-16",
+      "accelerator": "NVIDIA_L4",
+      "runner_kind": "l4-learned-eval"
+    },
+    "runtime_env": {
+      "AIC_DOCKER_GPUS": "all",
+      "AIC_EVAL_USE_LOCAL_LAUNCH": "1",
+      "AIC_GZ_VERBOSITY_LEVEL": "1",
+      "AIC_LEWM_DEVICE": "cuda",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "1",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "30",
+      "AIC_LEWM_CONTROL_HZ": "4",
+      "AIC_LEWM_NUM_ACTION_CANDIDATES": "4",
+      "AIC_LEWM_PLANNING_HORIZON": "1",
+      "AIC_LEWM_CHECKPOINT": "/opt/aic_lewm/aic_lewm_epoch_100_object.ckpt",
+      "AIC_LEWM_GOAL_DATASET": "/opt/aic_lewm/aic_qualification_train.h5"
+    },
+    "observed_runtime": {
+      "planner_budget": "4 candidates x horizon 1",
+      "planner_timing": "steady-state LEWM MPC calls were approximately 0.03-0.18s after CUDA warmup",
+      "policy_deadline": "wall-clock monotonic 30s per insert_cable action",
+      "trial_scores": {
+        "trial_1": 1.0,
+        "trial_2": 1.0,
+        "trial_3": 1.0
+      }
+    },
+    "limitations": [
+      "This is the first autonomous learned-policy evaluation score, not a tuned submission candidate.",
+      "All three trials received only tier-1 model validation credit; no insertion or tier-2 motion quality credit was earned.",
+      "The planner uses a small 4-candidate horizon-1 budget for runtime reliability; larger budgets need separate evaluation before use."
+    ]
+  },
+  "hypothesis": "A source-correct learned-policy image with wall-clock runtime enforcement and a bounded 4x1 MPC budget will complete the official three-trial evaluator without lifecycle hangs, producing the first autonomous LEWM policy score for submission gating.",
+  "kind": "learned_policy_eval",
+  "notes": [
+    "This run proves the submission container can load the trained LEWM checkpoint and complete the official three-trial evaluator autonomously.",
+    "A stale pixi local-package cache initially hid policy edits in Docker; the Dockerfile now reinstalls aic_lewm_policy from copied source after pixi install.",
+    "The policy deadline now uses monotonic wall-clock time, not ROS/sim time, and publishes a final zero velocity command on exit.",
+    "The score is only 3.0: all credit came from tier-1 validation, with no insertion detected on any trial."
+  ],
+  "promotion": {
+    "decision": "rejected",
+    "accepted": false,
+    "eligible_for_submission": false,
+    "reason": "Learned-policy score 3.0 is below baseline 97.819241.",
+    "decided_at_utc": "2026-04-22T03:45:32Z",
+    "metric": {
+      "baseline_value": 97.819241,
+      "goal": "max",
+      "min_improvement": 0.0,
+      "name": "evaluation.score.total",
+      "value": 3.0
+    },
+    "baseline_note": "Current harness baseline is the initial smoke baseline; this run is the first autonomous learned-policy score but did not earn insertion credit.",
+    "report_path": "promotion_report.json",
+    "notes": [
+      "Promotion gate was run because a learned-policy evaluation score exists.",
+      "Rejected runs remain useful as empirical baselines for runtime reliability and future ablations."
+    ]
+  },
+  "run_id": "learned-20260422T030153Z-aic-lewm-policy-l4-fast",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {
+    "source_run_id": "real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu",
+    "run_name": "real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu",
+    "data_config": "aic",
+    "input_dataset_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5",
+    "max_epochs": 100,
+    "trainer": {
+      "accelerator": "gpu",
+      "batch_size": 64,
+      "devices": 1,
+      "stop_reason": "max_epochs=100 reached"
+    },
+    "output": {
+      "checkpoint_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_weights.ckpt",
+      "object_checkpoint_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_epoch_100_object.ckpt",
+      "config_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/config.yaml",
+      "gcs_prefix": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/"
+    }
+  },
+  "updated_at_utc": "2026-04-22T03:45:50Z",
+  "cleanup": {
+    "gpu_eval_instance": {
+      "instance": "aic-lewm-l4",
+      "zone": "us-west4-a",
+      "action": "stopped",
+      "status": "TERMINATED"
+    },
+    "remaining_aic_instances": [
+      {
+        "instance": "aic-lewm-l4",
+        "zone": "us-west4-a",
+        "machine_type": "g2-standard-16",
+        "status": "TERMINATED"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T16:58:03Z",
+  "decision": "rejected",
+  "eligible_for_submission": false,
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T152543Z-replay10hz7p2/manifest.json",
+  "metric": {
+    "baseline_value": 122.39001511101944,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 96.58907127988778
+  },
+  "notes": [
+    "Promotion gate was run after official replay evaluation.",
+    "Rejected as the active baseline because the SC trial collision erased the SFP gains."
+  ],
+  "reason": "96.58907127988778 < 122.39001511101944 + 1.0",
+  "report_path": "promotion_report.json",
+  "run_id": "gate2-20260422T152543Z-replay10hz7p2",
+  "schema_version": 1
+}

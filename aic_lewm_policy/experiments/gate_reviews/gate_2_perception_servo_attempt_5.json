@@ -1,0 +1,24 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "Official run gate2-20260422T230909Z-latbias completed under the experiment harness and scored 128.008724 total versus the promoted 127.780187 SC-stop baseline.",
+    "The score improved over the promoted baseline by +0.228538, below the +1.0 promotion margin, and was -0.008493 below the prior delta-guard candidate.",
+    "Trial scores were 48.576075, 49.003592, and 30.429058.",
+    "The mined SFP final servo vector was linear=(-0.01, 0.02, -0.012) with delta force guard at 4N and 0.75s duration.",
+    "Trial 1 captured a delta force baseline then tripped the force guard at 6.11N; official scoring also reported a transient 28.24N insertion-force event below the penalty duration.",
+    "Trial 2 did not trip the force guard, but final distance worsened from 0.02m in the previous delta-guard run to 0.03m here.",
+    "Official scoring and offline bag analysis reported zero off-limit contacts on all three trials.",
+    "No insertion was detected; final distances were 0.02m, 0.03m, and 0.13m."
+  ],
+  "gate_id": "gate_2_perception_servo",
+  "next_requirements": [
+    "Keep the baseline-relative delta force guard as the safety contract, but reject fixed lateral-bias push as a Gate 2 solution.",
+    "Replace hand-chosen constant final-servo vectors with an adaptive insertion primitive that estimates lateral error and insertion axis online from legal observations.",
+    "Before another official run, add an offline acceptance gate that predicts whether a candidate primitive should improve trial-2 final distance without tripping trial-1 force guard.",
+    "Mine the lat-bias bag against the prior delta-guard bag to identify whether force guard timing, lateral sign, or insertion-axis misalignment caused the score regression.",
+    "Gate 2 remains open until official evidence shows insertion/contact credit or a materially stronger legal final-centimeter improvement than proximity-only tuning."
+  ],
+  "reviewed_at_utc": "2026-04-23T00:53:04Z",
+  "run_id": "gate2-20260422T230909Z-latbias",
+  "schema_version": 1
+}

@@ -1,0 +1,23 @@
+{
+  "accepted": true,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T18:57:57Z",
+  "decision": "accepted",
+  "eligible_for_submission": true,
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T172605Z-scstop2p75/manifest.json",
+  "metric": {
+    "baseline_value": 122.39001511101944,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 127.78018667287431
+  },
+  "notes": [
+    "Promotion gate was run after official replay evaluation.",
+    "Accepted as a score baseline only; Gate 2 remains open because no insertion/contact credit was earned."
+  ],
+  "reason": "127.78018667287431 >= 122.39001511101944 + 1.0",
+  "report_path": "promotion_report.json",
+  "run_id": "gate2-20260422T172605Z-scstop2p75",
+  "schema_version": 1
+}

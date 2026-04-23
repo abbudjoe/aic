@@ -15,9 +15,9 @@ services:
       AIC_MODEL_PASSWD: CHANGE_IN_PROD
       # AIC_ENABLE_ACL: true
   model:
-    image: my-solution:v1
+    image: aic-lewm-solution:v1
     build:
-      dockerfile: docker/aic_model/Dockerfile
+      dockerfile: docker/aic_lewm_policy/Dockerfile
       context: ..
     gpus: all
     networks:

@@ -1,0 +1,64 @@
+{
+  "acceptance_before_promotion": [
+    "Official eval completes under the harness.",
+    "Zero off-limit contacts on all trials.",
+    "Improves over the promoted score baseline by at least +1.0, or earns insertion/contact evidence that justifies further Gate 2 iteration.",
+    "If rejected, append ledger and keep gate_2 in progress."
+  ],
+  "candidate_env": {
+    "AIC_LEWM_FINAL_SERVO_DURATION_SEC": "0.75",
+    "AIC_LEWM_FINAL_SERVO_ENABLED": "1",
+    "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE": "delta",
+    "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "4",
+    "AIC_LEWM_SC_FINAL_SERVO_ANGULAR": "0,0,0",
+    "AIC_LEWM_SC_FINAL_SERVO_LINEAR": "0,0,0",
+    "AIC_LEWM_SFP_FINAL_SERVO_ANGULAR": "0,0,0",
+    "AIC_LEWM_SFP_FINAL_SERVO_LINEAR": "-0.01,0.02,-0.012"
+  },
+  "candidate_rationale": [
+    "The lateral signs are consistent across the two SFP failures: move negative x and positive y in the base command frame.",
+    "A 0.75s command at -0.01,+0.02 m/s covers about -7.5mm,+15mm before controller/contact effects, matching trial 2 and exceeding trial 1 only moderately.",
+    "The axial component is reduced from -0.02 to -0.012 m/s to avoid jamming while lateral alignment changes.",
+    "The existing SC 2.75s stop remains unchanged because SC was already made safe by stopping before the enclosure contact."
+  ],
+  "created_at_utc": "2026-04-22T23:05:28Z",
+  "finding": "The delta force guard allowed final-servo motion, but SFP failures are dominated by lateral offset at/near the entrance, not lack of axial advance alone.",
+  "schema_version": 1,
+  "sfp_trials": [
+    {
+      "final_lateral_error_m": 0.006,
+      "final_signed_depth_from_entrance_m": -1e-05,
+      "final_tip_minus_port_link_m": [
+        0.00299,
+        -0.00579,
+        0.04574
+      ],
+      "interpretation": "Tip reached the entrance plane but did not enter; axial push accumulated TCP reference error while the plug tip stayed laterally offset.",
+      "servo_start_tip_minus_port_link_m": [
+        0.00295,
+        -0.00579,
+        0.04574
+      ],
+      "target_port_inferred": "sfp_port_0",
+      "trial": "trial_1"
+    },
+    {
+      "final_lateral_error_m": 0.0156,
+      "final_signed_depth_from_entrance_m": 0.04231,
+      "final_tip_minus_port_link_m": [
+        0.00716,
+        -0.0139,
+        0.00332
+      ],
+      "interpretation": "Axial depth improved, but the tip remained about 1.6 cm laterally from the port centerline.",
+      "servo_start_tip_minus_port_link_m": [
+        0.00739,
+        -0.01371,
+        0.01359
+      ],
+      "target_port_inferred": "sfp_port_0",
+      "trial": "trial_2"
+    }
+  ],
+  "source_run_id": "gate2-20260422T212109Z-deltaguard"
+}

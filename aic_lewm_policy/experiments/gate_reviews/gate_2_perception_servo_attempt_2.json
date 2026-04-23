@@ -1,0 +1,22 @@
+{
+  "decision": "iterate",
+  "evidence": [
+    "Offline bag analysis of gate2-20260422T152543Z-replay10hz7p2 found first SC off-limit enclosure contact at 3.036s controller elapsed.",
+    "AIC_LEWM_SC_REPLAY_STOP_SEC=2.75 engaged during the SC trial and eliminated the official contact penalty.",
+    "gate2-20260422T172605Z-scstop2p75 scored 127.780187 total, improving over the previous promoted baseline 122.390015 by 5.390172.",
+    "Trial scores were 48.636627, 48.965941, and 30.177619.",
+    "Official scoring reported no contact detected on all trials.",
+    "No insertion was detected; final distances were 0.05m, 0.02m, and 0.14m."
+  ],
+  "gate_id": "gate_2_perception_servo",
+  "next_requirements": [
+    "Keep the 10Hz replay cadence and SC 2.75s stop as the current promoted replay baseline.",
+    "Add a legal final-centimeter servo for the SC trial, because stop-only safety removed the penalty but left 0.14m final distance.",
+    "Add an SFP insertion/contact primitive that acts after the 0.02m trial-2 approach without using eval-time ground-truth TF.",
+    "Before the next official run, run offline bag analysis on candidate bags and require zero off-limit contacts plus an explicit expected final-distance improvement hypothesis.",
+    "Gate 2 remains open until official evidence shows insertion/contact or a stronger legal servo improvement, not just replay score promotion."
+  ],
+  "reviewed_at_utc": "2026-04-22T18:57:57Z",
+  "run_id": "gate2-20260422T172605Z-scstop2p75",
+  "schema_version": 1
+}

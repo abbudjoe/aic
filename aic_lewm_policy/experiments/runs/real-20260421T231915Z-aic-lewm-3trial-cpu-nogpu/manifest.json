@@ -1,0 +1,248 @@
+{
+  "artifacts": [
+    {
+      "content_md5": "C1P3fF+PU//mNKAnOZTPcw==",
+      "crc32c": "wcNYXw==",
+      "generation": "1776816999017495",
+      "kind": "dataset",
+      "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+      "size_bytes": 23840392,
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5"
+    },
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json"
+    },
+    {
+      "kind": "collection_eval_log",
+      "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/eval.log"
+    },
+    {
+      "kind": "collection_model_log",
+      "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/model.log"
+    },
+    {
+      "kind": "collection_scoring_yaml",
+      "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/eval/scoring.yaml"
+    },
+    {
+      "kind": "collection_env",
+      "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu.gcp.env"
+    },
+    {
+      "kind": "training_env",
+      "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu.train.gcp.env"
+    },
+    {
+      "content_md5": "kbPwIbVaetTMPgLT+vOaNA==",
+      "crc32c": "PjiejA==",
+      "generation": "1776818224770045",
+      "kind": "checkpoint",
+      "size_bytes": 216789929,
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_weights.ckpt"
+    },
+    {
+      "content_md5": "08k4pnUM78F5PxSPT07+Ww==",
+      "crc32c": "8dOc5Q==",
+      "generation": "1776818215692347",
+      "kind": "training_config",
+      "size_bytes": 1220,
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/config.yaml"
+    }
+  ],
+  "cleanup": {
+    "cpu_collection_instance": {
+      "action": "deleted",
+      "instance": "aic-lewm-cpu-collect-16",
+      "zone": "us-west4-c"
+    },
+    "gpu_training_instance": {
+      "action": "deleted",
+      "instance": "aic-lewm-l4-c-4-retry",
+      "zone": "us-west4-c"
+    },
+    "remaining_aic_instances": [
+      {
+        "instance": "aic-lewm-l4",
+        "machine_type": "g2-standard-16",
+        "status": "TERMINATED",
+        "zone": "us-west4-a"
+      }
+    ]
+  },
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   5 ++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 676232 bytes\n pixi.toml                                   |   2 ++\n 5 files changed, 12 insertions(+), 3 deletions(-)",
+    "dirty": true,
+    "note": "Run used local uncommitted AIC LEWM integration plus cloud launcher and simulator startup changes.",
+    "run_relevant_changes": [
+      "aic_bringup/launch/aic_gz_bringup.launch.py",
+      "aic_lewm_policy/",
+      "docker/aic_lewm_policy/",
+      "docker/docker-compose.yaml",
+      "pixi.toml",
+      "pixi.lock"
+    ],
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "collection": {
+    "cloud": {
+      "boot_disk_type": "pd-standard",
+      "instance": "aic-lewm-cpu-collect-16",
+      "machine_type": "n2-standard-16",
+      "project": "project-81f2add4-9e80-4335-bb6",
+      "runner_kind": "cpu-collect",
+      "zone": "us-west4-c"
+    },
+    "eval_exit_code": 0,
+    "eval_image": "ghcr.io/intrinsic-dev/aic/aic_eval:latest",
+    "participant_image": "aic-lewm-recording:real-20260421T225940Z-aic-lewm-3trial-cpu-collect",
+    "policy": "aic_lewm_policy.RecordingCheatCode",
+    "runtime_env": {
+      "AIC_DOCKER_GPUS": "0",
+      "AIC_EVAL_USE_LOCAL_LAUNCH": "1",
+      "AIC_GZ_VERBOSITY_LEVEL": "1",
+      "AIC_LEWM_CHEATCODE_APPROACH_SLEEP": "0.02",
+      "AIC_LEWM_CHEATCODE_APPROACH_STEPS": "40",
+      "AIC_LEWM_CHEATCODE_INSERT_SLEEP": "0.02",
+      "AIC_LEWM_CHEATCODE_INSERT_Z_STEP": "0.003",
+      "AIC_LEWM_CHEATCODE_STABILIZE_SLEEP": "1.0",
+      "AIC_LEWM_RECORD_FLUSH_EVERY": "10",
+      "AIC_LEWM_RECORD_HZ": "20",
+      "AIC_LEWM_RECORD_IMAGE_SCALE": "0.25"
+    },
+    "score": {
+      "source": "AIC engine score from the RecordingCheatCode data collection run",
+      "total": 257.2016105939469,
+      "trial_count": 3
+    },
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 21.14930026195177,
+        "tier_3": 75.0,
+        "total": 97.14930026195177
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 22.6484237422898,
+        "tier_3": 38.01046535600226,
+        "total": 61.65888909829206
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 22.39342123370306,
+        "tier_3": 75.0,
+        "total": 98.39342123370307
+      }
+    },
+    "warning": "This collection policy uses ground-truth TF and is not submission-eligible.",
+    "wrapper_exit_code": 124,
+    "wrapper_exit_note": "The local timeout wrapper was paused to avoid killing a slow CPU collection; it returned 124 only after the official evaluator had completed with exit code 0 and artifacts were copied."
+  },
+  "created_at_utc": "2026-04-21T23:19:36Z",
+  "dataset": {
+    "content_md5": "C1P3fF+PU//mNKAnOZTPcw==",
+    "crc32c": "wcNYXw==",
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "episode_offsets": [
+      0,
+      67,
+      136
+    ],
+    "generation": "1776816999017495",
+    "report_path": "dataset_report.json",
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "size_bytes": 23840392,
+    "step_count": 207,
+    "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5",
+    "validation": {
+      "episode_lengths": [
+        67,
+        69,
+        71
+      ],
+      "ok": true,
+      "validated_at_utc": "2026-04-22T00:16:34Z"
+    }
+  },
+  "description": "First real harnessed run: collect the official three-trial RecordingCheatCode dataset on a CPU runner, validate and upload HDF5, train LEWM for 100 epochs on one temporary L4 runner, and sync checkpoints to a run-unique GCS prefix.",
+  "evaluation": {
+    "limitations": [
+      "Score is from the ground-truth RecordingCheatCode collection policy, not from the learned LEWM policy.",
+      "The trained checkpoint has not yet been evaluated as an autonomous submission policy.",
+      "Promotion gate was intentionally skipped because no learned-policy evaluation score exists for this checkpoint."
+    ],
+    "score": {
+      "scope": "three_trial_collection_score",
+      "source": "AIC engine score during RecordingCheatCode data collection",
+      "total": 257.2016105939469,
+      "trial_count": 3
+    }
+  },
+  "hypothesis": "A CPU-only collection runner with explicit no-GPU Docker configuration will avoid both the g2-standard-4 simulator spawn race and the GPU device-driver contract failure; the resulting three-trial HDF5 should support a full LEWM training run on an L4 runner.",
+  "kind": "record_train",
+  "notes": [
+    "This run establishes the first official three-trial data and training artifact path under the experiment harness.",
+    "The learned checkpoint is a training artifact only until it passes an autonomous learned-policy evaluation.",
+    "Collection trial 2 received partial insertion credit; trials 1 and 3 reached full tier-3 insertion credit."
+  ],
+  "promotion": {
+    "decision": "not_evaluated",
+    "eligible_for_submission": false,
+    "reason": "No learned-policy evaluation score exists for this trained checkpoint.",
+    "skipped_by_rule": "promotion gate runs only after learned-policy evaluation"
+  },
+  "run_id": "real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {
+    "cloud": {
+      "accelerator": "NVIDIA_L4",
+      "boot_disk_type": "pd-standard",
+      "instance": "aic-lewm-l4-c-4-retry",
+      "machine_type": "g2-standard-4",
+      "project": "project-81f2add4-9e80-4335-bb6",
+      "runner_kind": "temp-l4",
+      "zone": "us-west4-c"
+    },
+    "data_config": "aic",
+    "input_dataset_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/datasets/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_qualification_train.h5",
+    "launcher": "aic_lewm_policy/cloud/gcp/vm_train_aic_lewm.sh",
+    "max_epochs": 100,
+    "output": {
+      "artifact_count": 102,
+      "checkpoint_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/aic_lewm_weights.ckpt",
+      "config_uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/config.yaml",
+      "epoch_checkpoint_count": 100,
+      "gcs_prefix": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/checkpoints/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/"
+    },
+    "run_name": "real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu",
+    "trainer": {
+      "accelerator": "gpu",
+      "batch_size": 64,
+      "devices": 1,
+      "stop_reason": "max_epochs=100 reached"
+    }
+  },
+  "updated_at_utc": "2026-04-22T00:40:16Z"
+}

@@ -1,0 +1,30 @@
+{
+  "parsed_at_utc": "2026-04-22T00:16:27Z",
+  "path": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/eval/scoring.yaml",
+  "schema_version": 1,
+  "score": {
+    "source": "artifacts/real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu/eval/scoring.yaml",
+    "total": 257.2016105939469,
+    "trial_count": 3,
+    "trials": {
+      "trial_1": {
+        "tier_1": 1.0,
+        "tier_2": 21.14930026195177,
+        "tier_3": 75.0,
+        "total": 97.14930026195177
+      },
+      "trial_2": {
+        "tier_1": 1.0,
+        "tier_2": 22.6484237422898,
+        "tier_3": 38.01046535600226,
+        "total": 61.65888909829206
+      },
+      "trial_3": {
+        "tier_1": 1.0,
+        "tier_2": 22.39342123370306,
+        "tier_3": 75.0,
+        "total": 98.39342123370307
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "accepted": false,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T22:54:50Z",
+  "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T212109Z-deltaguard/manifest.json",
+  "metric": {
+    "baseline_value": 127.78018667287431,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 128.01721760888628
+  },
+  "notes": [
+    "Promotion gate was run after official replay evaluation.",
+    "Expected rejection under the +1.0 margin despite a small score improvement; Gate 2 DoD also requires insertion-relevant progress."
+  ],
+  "reason": "128.01721760888628 < 127.78018667287431 + 1.0",
+  "run_id": "gate2-20260422T212109Z-deltaguard",
+  "schema_version": 1
+}

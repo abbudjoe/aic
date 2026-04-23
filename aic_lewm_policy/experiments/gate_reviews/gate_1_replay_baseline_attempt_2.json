@@ -1,0 +1,23 @@
+{
+  "decision": "proceed",
+  "evidence": [
+    "Official replay eval replay-20260422T063538Z-gate1-sim2p5-full completed all three trials and scored 106.576452 total.",
+    "Trial scores were 38.560609, 39.186751, and 28.829093.",
+    "Replay selected exact demonstration episodes for all three public task/module combinations.",
+    "The timing/control-plane fixes raised replay from 3.0 to 106.576452: observation-time action indexing, short Docker router aliases, and a 2.5 simulated-second replay horizon.",
+    "Tier 2 and Tier 3 proximity credit were nonzero on every trial; final distances were 0.07m, 0.07m, and 0.15m.",
+    "No insertion or contact was detected, so replay alone is not enough for leaderboard-top performance.",
+    "The policy used official observations/task metadata and did not query eval-time ground-truth TF."
+  ],
+  "gate_id": "gate_1_replay_baseline",
+  "next_requirements": [
+    "Start Gate 2 with legal closed-loop perception/servo rather than more open-loop replay tuning.",
+    "Generate supervised labels for plug pose, port pose, insertion axis, and image-space alignment from training-time TF only.",
+    "Build an offline validation set from the three official bags plus collection bags to estimate final plug-port distance and correction direction.",
+    "Implement a servo primitive that uses legal observations at eval time, with replay as approach prior and perception/contact logic for the final centimeters.",
+    "Gate 2 should require insertion/contact evidence or a large Tier 3 gain, not merely more duration/smoothness credit."
+  ],
+  "reviewed_at_utc": "2026-04-22T07:24:22Z",
+  "run_id": "replay-20260422T063538Z-gate1-sim2p5-full",
+  "schema_version": 1
+}

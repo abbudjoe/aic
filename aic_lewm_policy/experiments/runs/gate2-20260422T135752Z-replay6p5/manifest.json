@@ -1,0 +1,154 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/gate2-20260422T135752Z-replay6p5"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n aic_model/aic_model/aic_model.py            |   4 +++-\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 6 files changed, 18 insertions(+), 4 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M aic_model/aic_model/aic_model.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T15:23:44Z",
+  "dataset": {
+    "episode_count": 3,
+    "episode_lengths": [
+      67,
+      69,
+      71
+    ],
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 2 ablation: extend replay runtime to 6.5 simulated seconds while keeping the previous 20Hz replay indexing.",
+  "evaluation": {
+    "analysis": {
+      "baseline_total": 106.5764522524607,
+      "delta_vs_baseline": 15.81356285855874,
+      "finding": "Longer 20Hz replay improves total score but still consumes the 10Hz-recorded demonstration too quickly and holds still before insertion settles."
+    },
+    "official_result_path": "artifacts/cloud-logs/gate2-20260422T135752Z-replay6p5/eval/scoring.yaml",
+    "participant_image": "aic-lewm-gate2:gate2-20260422T135752Z-replay6p5",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "report_path": "replay_check.json"
+    },
+    "runtime_env": {
+      "AIC_EVAL_TIMEOUT_SEC": "7200",
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "6.5",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "20",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1",
+      "AIC_LEWM_REQUIRE_CHECKPOINT": "0"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/gate2-20260422T135752Z-replay6p5/eval/scoring.yaml",
+      "total": 122.39001511101944,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 21.468307244461176,
+          "tier_3": 24.704406129575197,
+          "total": 47.17271337403638
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 22.935041317252725,
+          "tier_3": 14.383282975116728,
+          "total": 38.318324292369454
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 22.903813506801143,
+          "tier_3": 12.995163937812457,
+          "total": 36.8989774446136
+        }
+      }
+    },
+    "score_report_path": "score_report.json",
+    "trial_summary": {
+      "contact_detected": false,
+      "insertion_detected": false,
+      "trial_1_final_distance_m": 0.05,
+      "trial_2_final_distance_m": 0.08,
+      "trial_3_final_distance_m": 0.09
+    }
+  },
+  "hypothesis": "If Gate 1 failed mostly because it truncated before insertion, a 6.5 simulated-second replay horizon should earn insertion or substantially more Tier 3 credit without changing the policy code.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Trial 1 improved to 47.17 total with final distance 0.05m.",
+    "Trials 2 and 3 remained near the prior replay baseline, with final distances 0.08m and 0.09m.",
+    "The dataset was recorded at AIC_LEWM_RECORD_HZ=10 by default, but this run replayed at 20Hz; the next candidate should align replay_hz to the recording cadence."
+  ],
+  "promotion": {
+    "accepted": true,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T15:23:52Z",
+    "decision": "accepted",
+    "eligible_for_submission": true,
+    "manifest_path": "aic_lewm_policy/experiments/runs/gate2-20260422T135752Z-replay6p5/manifest.json",
+    "metric": {
+      "baseline_value": 106.5764522524607,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 122.39001511101944
+    },
+    "notes": [
+      "Promotion gate accepted this horizon ablation as the current empirical baseline.",
+      "Accepted as a score baseline only; Gate 2 remains open because no contact or insertion was detected."
+    ],
+    "reason": "122.39001511101944 >= 106.5764522524607 + 1.0",
+    "report_path": "promotion_report.json",
+    "run_id": "gate2-20260422T135752Z-replay6p5",
+    "schema_version": 1
+  },
+  "run_id": "gate2-20260422T135752Z-replay6p5",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T15:24:20Z"
+}

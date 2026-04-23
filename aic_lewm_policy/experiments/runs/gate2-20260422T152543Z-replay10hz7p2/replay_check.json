@@ -1,0 +1,57 @@
+{
+  "checks": [
+    {
+      "angular_norm_max": 0.268520712852478,
+      "duration_sec_at_replay_hz": 6.7,
+      "exact_episode_match": true,
+      "expected_episode": 0,
+      "linear_norm_max": 0.2184535413980484,
+      "selected_episode": 0,
+      "step_count": 67,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_0",
+        "task_id": "task_1"
+      }
+    },
+    {
+      "angular_norm_max": 0.29675841331481934,
+      "duration_sec_at_replay_hz": 6.9,
+      "exact_episode_match": true,
+      "expected_episode": 1,
+      "linear_norm_max": 0.059786420315504074,
+      "selected_episode": 1,
+      "step_count": 69,
+      "task": {
+        "plug_type": "sfp",
+        "port_type": "sfp",
+        "target_module_name": "nic_card_mount_1",
+        "task_id": "task_1"
+      }
+    },
+    {
+      "angular_norm_max": 0.3650479316711426,
+      "duration_sec_at_replay_hz": 7.1,
+      "exact_episode_match": true,
+      "expected_episode": 2,
+      "linear_norm_max": 0.1334313154220581,
+      "selected_episode": 2,
+      "step_count": 71,
+      "task": {
+        "plug_type": "sc",
+        "port_type": "sc",
+        "target_module_name": "sc_port_1",
+        "task_id": "task_1"
+      }
+    }
+  ],
+  "dataset": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+  "episode_count": 3,
+  "replay_hz": 10.0,
+  "schema_version": 1,
+  "score": {
+    "exact_selection_count": 3,
+    "exact_selection_fraction": 1.0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "accepted": true,
+  "checkpoint_uri": null,
+  "decided_at_utc": "2026-04-22T07:23:04Z",
+  "decision": "accepted",
+  "eligible_for_submission": true,
+  "manifest_path": "aic_lewm_policy/experiments/runs/replay-20260422T063538Z-gate1-sim2p5-full/manifest.json",
+  "metric": {
+    "baseline_value": 97.819241,
+    "goal": "max",
+    "min_improvement": 1.0,
+    "name": "evaluation.score.total",
+    "value": 106.5764522524607
+  },
+  "notes": [
+    "Promotion gate accepted this official submission-eligible replay evaluation over the previous harness baseline.",
+    "Accepted as the current empirical baseline, not as Gate 1 completion; no insertion/contact credit was earned."
+  ],
+  "reason": "106.5764522524607 >= 97.819241 + 1.0",
+  "run_id": "replay-20260422T063538Z-gate1-sim2p5-full",
+  "schema_version": 1
+}

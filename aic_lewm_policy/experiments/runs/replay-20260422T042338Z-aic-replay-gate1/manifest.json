@@ -1,0 +1,147 @@
+{
+  "artifacts": [
+    {
+      "kind": "dataset_report",
+      "path": "dataset_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/dataset_report.json"
+    },
+    {
+      "kind": "score_report",
+      "path": "score_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/score_report.json"
+    },
+    {
+      "kind": "replay_check",
+      "path": "replay_check.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/replay_check.json"
+    },
+    {
+      "kind": "eval_bundle",
+      "path": "artifacts/cloud-logs/replay-20260422T042338Z-aic-replay-gate1",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/eval_bundle/"
+    },
+    {
+      "kind": "promotion_report",
+      "path": "promotion_report.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/promotion_report.json"
+    },
+    {
+      "kind": "roadmap",
+      "path": "aic_lewm_policy/experiments/roadmap.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/roadmap.json"
+    },
+    {
+      "kind": "gate_review",
+      "path": "aic_lewm_policy/experiments/gate_reviews/gate_1_replay_baseline_attempt_1.json",
+      "uri": "gs://fractal-maxtext-runs-81f2add4/aic-lewm/runs/replay-20260422T042338Z-aic-replay-gate1/harness/gate_reviews/gate_1_replay_baseline_attempt_1.json"
+    }
+  ],
+  "code": {
+    "branch": "HEAD",
+    "commit": "5979070b8e5260ecc5212a9a0d413e06e10033c2",
+    "diff_stat": ".gitignore                                  |   7 ++++++-\n aic_bringup/launch/aic_gz_bringup.launch.py |   4 ++++\n docker/docker-compose.yaml                  |   4 ++--\n pixi.lock                                   | Bin 669641 -> 688783 bytes\n pixi.toml                                   |   3 +++\n 5 files changed, 15 insertions(+), 3 deletions(-)",
+    "dirty": true,
+    "status_short": [
+      "M .gitignore",
+      " M aic_bringup/launch/aic_gz_bringup.launch.py",
+      " M docker/docker-compose.yaml",
+      " M pixi.lock",
+      " M pixi.toml",
+      "?? .codex/",
+      "?? aic_lewm_policy/",
+      "?? docker/aic_lewm_policy/"
+    ]
+  },
+  "created_at_utc": "2026-04-22T05:03:48Z",
+  "dataset": {
+    "episode_count": 3,
+    "sha256": "c8bea4b6a25537cd3ff1ebe4f269e643b8cbd0a6f1fb5eccc7da3db2d20c4f64",
+    "step_count": 207,
+    "uri": "aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5",
+    "validation": {
+      "ok": true,
+      "report_path": "dataset_report.json"
+    }
+  },
+  "description": "Gate 1 replay baseline: submission-eligible demonstration action replay using public task metadata, base_link velocity commands, and the official three-trial AIC eval.",
+  "evaluation": {
+    "official_result_path": "artifacts/cloud-logs/replay-20260422T042338Z-aic-replay-gate1/eval/scoring.yaml",
+    "participant_image": "aic-lewm-replay:replay-20260422T042338Z-aic-replay-gate1",
+    "planner_mode": "replay",
+    "policy": "aic_lewm_policy.LewmMpcPolicy",
+    "replay_check": {
+      "exact_selection_fraction": 1.0,
+      "report_path": "replay_check.json"
+    },
+    "runtime_env": {
+      "AIC_LEWM_ANGULAR_VEL_LIMIT": "2.0",
+      "AIC_LEWM_COMMAND_FRAME": "base_link",
+      "AIC_LEWM_CONTROL_HZ": "20",
+      "AIC_LEWM_LINEAR_VEL_LIMIT": "0.25",
+      "AIC_LEWM_MAX_RUNTIME_SEC": "30",
+      "AIC_LEWM_PLANNER_MODE": "replay",
+      "AIC_LEWM_REPLAY_ACTION_GAIN": "1",
+      "AIC_LEWM_REPLAY_HZ": "20",
+      "AIC_LEWM_REPLAY_TIME_SCALE": "1"
+    },
+    "score": {
+      "source": "artifacts/cloud-logs/replay-20260422T042338Z-aic-replay-gate1/eval/scoring.yaml",
+      "total": 3.0,
+      "trial_count": 3,
+      "trials": {
+        "trial_1": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        },
+        "trial_2": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        },
+        "trial_3": {
+          "tier_1": 1.0,
+          "tier_2": 0.0,
+          "tier_3": 0.0,
+          "total": 1.0
+        }
+      }
+    },
+    "score_report_path": "score_report.json"
+  },
+  "hypothesis": "Exact task-to-episode replay may recover some insertion/proximity credit without eval-time ground-truth TF; if it does not, Gate 1 should require visual servo or pose-estimation correction before advancing.",
+  "kind": "replay_policy_eval",
+  "notes": [
+    "Gate 1 replay selected the exact demonstration episode for each official task/module combination.",
+    "Official eval still scored only Tier 1 on all trials, so action replay is dynamically insufficient without closed-loop perception/servo correction.",
+    "No eval-time ground-truth TF or Gazebo/scoring namespace access was used by the replay planner."
+  ],
+  "promotion": {
+    "accepted": false,
+    "checkpoint_uri": null,
+    "decided_at_utc": "2026-04-22T05:06:13Z",
+    "eligible_for_submission": false,
+    "manifest_path": "aic_lewm_policy/experiments/runs/replay-20260422T042338Z-aic-replay-gate1/manifest.json",
+    "metric": {
+      "baseline_value": 97.819241,
+      "goal": "max",
+      "min_improvement": 1.0,
+      "name": "evaluation.score.total",
+      "value": 3.0
+    },
+    "notes": [
+      "Promotion gate was run after official replay evaluation.",
+      "Gate 1 should iterate on closed-loop visual servoing rather than advance to Gate 2 completion."
+    ],
+    "reason": "Replay score ties the learned-policy legal baseline at 3.0 and remains below the current harness baseline; no Tier 2/Tier 3 credit.",
+    "run_id": "replay-20260422T042338Z-aic-replay-gate1",
+    "schema_version": 1
+  },
+  "run_id": "replay-20260422T042338Z-aic-replay-gate1",
+  "schema_version": 1,
+  "status": "completed",
+  "training": {},
+  "updated_at_utc": "2026-04-22T05:10:06Z"
+}

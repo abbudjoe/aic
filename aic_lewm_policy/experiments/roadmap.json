@@ -1,0 +1,168 @@
+{
+  "decision_policy": {
+    "gate_review": "A gate may move to completed only when a gate review exists with evidence, decision, and next requirements.",
+    "step_review": "Each experiment inside a gate must produce a harness manifest, score report when available, ledger entry, and a short decision about whether to iterate inside the gate or advance."
+  },
+  "gates": [
+    {
+      "entry_criteria": [
+        "Repository has a repeatable experiment harness and ledger.",
+        "Official scoring output can be parsed into evaluation.score.total."
+      ],
+      "evidence": [
+        "learned-20260422T030153Z-aic-lewm-policy-l4-fast scored 3.0 as a submission-eligible learned-policy eval.",
+        "real-20260421T231915Z-aic-lewm-3trial-cpu-nogpu collected a 3-trial HDF5 dataset and trained LEWM, but its 257.2016 collection score is not submission-eligible."
+      ],
+      "exit_criteria": [
+        "Harness validates manifests and datasets.",
+        "At least one autonomous learned-policy evaluation establishes the current legal baseline.",
+        "Ground-truth collection scores are explicitly marked not submission-eligible."
+      ],
+      "id": "gate_0_harness_and_baseline",
+      "metric": {
+        "current": 3.0,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "Harness and Legal Baseline",
+      "next_gate": "gate_1_replay_baseline",
+      "objective": "Separate legal learned-policy evidence from ground-truth data-collection evidence.",
+      "review_path": "gate_reviews/gate_0_harness_and_baseline.json",
+      "status": "completed"
+    },
+    {
+      "entry_criteria": [
+        "A successful HDF5 demonstration dataset is available.",
+        "Policy runtime can select a non-LEWM planner without changing the lifecycle contract."
+      ],
+      "evidence": [
+        "Attempt 1 raw replay completed official eval but scored only Tier 1 on all trials (3.0 total).",
+        "Attempt 2 observation-time replay with short Docker router aliases and 2.5 simulated-second horizon completed official eval at 106.576452 total.",
+        "Exact task-to-episode matching is correct; remaining failure is final alignment/insertion, not lifecycle or router discovery.",
+        "Replay earns proximity credit but no insertion/contact credit, so Gate 2 must add legal closed-loop perception/servo correction."
+      ],
+      "exit_criteria": [
+        "Replay planner runs under the official lifecycle interface without eval-time TF or Gazebo state.",
+        "Official three-trial eval beats the 3.0 legal learned-policy baseline.",
+        "Gate review identifies whether failures are action-replay drift, perception/alignment drift, contact failure, or lifecycle/runtime failure."
+      ],
+      "id": "gate_1_replay_baseline",
+      "latest_review_path": "gate_reviews/gate_1_replay_baseline_attempt_2.json",
+      "latest_run_id": "replay-20260422T063538Z-gate1-sim2p5-full",
+      "metric": {
+        "current": 106.5764522524607,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "Replay Baseline",
+      "next_gate": "gate_2_perception_servo",
+      "objective": "Establish the simplest submission-eligible control baseline from recorded demonstration actions and public task metadata.",
+      "review_path": "gate_reviews/gate_1_replay_baseline_attempt_2.json",
+      "status": "completed"
+    },
+    {
+      "entry_criteria": [
+        "Replay baseline has an official scored failure analysis.",
+        "Training labels for port pose, plug pose, insertion axis, and alignment error can be generated from training-time TF."
+      ],
+      "evidence": [
+        "Gate 1 completed with 106.576452 replay baseline and no insertion/contact credit.",
+        "Gate 2 horizon ablation gate2-20260422T135752Z-replay6p5 scored 122.390015 but still earned no insertion/contact credit.",
+        "Replay cadence mismatch was fixed: RecordingCheatCode records at 10Hz, and replay/cloud defaults now use 10Hz with regression tests.",
+        "10Hz full-horizon run gate2-20260422T152543Z-replay10hz7p2 improved SFP proximity but scored 96.589071 overall after an SC enclosure collision penalty.",
+        "SC stop candidate gate2-20260422T172605Z-scstop2p75 removed the contact penalty and promoted the baseline to 127.780187, but no insertion was detected.",
+        "Next iteration must add legal final-centimeter servo/insertion behavior rather than more open-loop replay tuning.",
+        "Guarded SFP final-servo run gate2-20260422T191446Z-sfpservoz2 scored 127.294174 and was rejected; fixed downward servo did not earn insertion and trial 2 was already force-loaded at 20.77N.",
+        "Delta force-guard run gate2-20260422T212109Z-deltaguard fixed the static-load guard contract and scored 128.017218, but was not promoted because the gain over 127.780187 was below +1.0 and no insertion/contact credit was earned.",
+        "Lat-bias candidate gate2-20260422T230909Z-latbias completed at 128.008724 but was rejected: fixed -x/+y/-z final servo tripped trial-1 delta force guard and did not improve insertion/contact credit."
+      ],
+      "exit_criteria": [
+        "Perception model predicts target alignment accurately enough for closed-loop convergence in offline validation.",
+        "Official eval earns Tier 3 proximity or insertion credit on at least one trial.",
+        "Gate review states whether more synthetic rollouts are needed before behavior cloning."
+      ],
+      "id": "gate_2_perception_servo",
+      "latest_review_path": "gate_reviews/gate_2_perception_servo_attempt_5.json",
+      "latest_run_id": "gate2-20260422T230909Z-latbias",
+      "metric": {
+        "current": 127.78018667287431,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "Perception Servo",
+      "next_gate": "gate_3_synthetic_bc",
+      "objective": "Replace brittle replay drift with legal visual alignment and force-aware insertion control.",
+      "review_path": null,
+      "status": "in_progress"
+    },
+    {
+      "entry_criteria": [
+        "Perception-servo controller exposes residual failure cases.",
+        "Synthetic rollout generation can produce many labeled legal-observation trajectories."
+      ],
+      "exit_criteria": [
+        "BC or ACT-style policy improves over deterministic replay/servo in official or faithful local eval.",
+        "Policy remains wrapped by safety/contact logic and lifecycle deadlines.",
+        "Gate review states whether learned actions are stable enough for LEWM primitive ranking."
+      ],
+      "id": "gate_3_synthetic_bc",
+      "metric": {
+        "current": null,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "Synthetic BC",
+      "next_gate": "gate_4_lewm_critic",
+      "objective": "Use many training-time ground-truth rollouts to learn a broad legal-observation action prior.",
+      "review_path": null,
+      "status": "planned"
+    },
+    {
+      "entry_criteria": [
+        "Controller exposes a compact set of meaningful correction primitives.",
+        "LEWM has data containing successful and failed primitive outcomes."
+      ],
+      "exit_criteria": [
+        "LEWM critic ranks successful primitive corrections above failed ones offline.",
+        "Online LEWM ranking improves or preserves official score without violating runtime deadlines.",
+        "Gate review states whether LEWM should become core planner or remain auxiliary."
+      ],
+      "id": "gate_4_lewm_critic",
+      "metric": {
+        "current": null,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "LEWM Critic",
+      "next_gate": "gate_5_lewm_core",
+      "objective": "Use LEWM as a judge over meaningful correction primitives instead of raw velocity MPC.",
+      "review_path": null,
+      "status": "planned"
+    },
+    {
+      "entry_criteria": [
+        "LEWM critic improves primitive selection and meets latency constraints.",
+        "Perception/control stack can recover from replay and servo failures."
+      ],
+      "exit_criteria": [
+        "LEWM-centered planner beats the best non-LEWM submission candidate under the promotion gate.",
+        "Failure analysis shows LEWM is making causal planning improvements, not only acting as a cosmetic scorer.",
+        "Submission artifact passes lifecycle, scoring, and no-leakage checks."
+      ],
+      "id": "gate_5_lewm_core",
+      "metric": {
+        "current": null,
+        "goal": "max",
+        "name": "evaluation.score.total"
+      },
+      "name": "LEWM Core Planner",
+      "next_gate": null,
+      "objective": "Promote LEWM from auxiliary critic to the central planner only if the evidence supports it.",
+      "review_path": null,
+      "status": "planned"
+    }
+  ],
+  "objective": "Build a submission-eligible AIC qualification policy that climbs from replay, to legal perception/control, to LEWM-assisted and possibly LEWM-core planning.",
+  "schema_version": 1,
+  "updated_at_utc": "2026-04-23T00:53:04Z"
+}
