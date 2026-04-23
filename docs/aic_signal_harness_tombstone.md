@@ -17,6 +17,12 @@ current coding-agent signal schema the core AIC substrate. Use Codex as the
 current outer-loop operator and future-compatible orchestration shell, but do
 not put Codex in the real-time robot control loop.
 
+Do not make LEWM the center of the neutral harness. LEWM is one candidate
+policy backend, alongside replay servo policies, Isaac Lab/RSL-RL policies,
+LeRobot ACT policies, OpenVLA/pi0-style VLA policies, classical servo policies,
+and custom backends. The stable center is the typed experiment and episode
+contract that lets those candidates be compared under the official AIC runtime.
+
 The stable center of the system should be typed AIC episodes:
 
 ```text
@@ -37,6 +43,64 @@ Run
 
 Raw evidence remains in native formats. Offline reducers convert that evidence
 into typed traces and reports.
+
+## Candidate Backend Screen
+
+Every backend must pass a typed screen before it can be considered for live
+evaluation. The screen records:
+
+- backend kind and name;
+- runtime role;
+- training sources;
+- simulator sources;
+- expected artifacts;
+- provenance;
+- legal runtime input boundary;
+- runtime-boundary proof for live policies;
+- leakage classification;
+- backend-specific configuration.
+
+The first screen decision is intentionally neutral:
+
+- `replay_servo`: legal live policy candidate when driven only by legal
+  observations and demonstration artifacts allowed by the challenge rules.
+- `lewm_world_model`: legal live policy candidate only when the runtime model
+  consumes legal observations and emits commands through `aic_model`.
+- `isaac_rl`: candidate backend for policies trained in Isaac Lab. Isaac Lab is
+  a simulator and synthetic-data/training generator, not the official scoring
+  authority.
+- `lerobot_act`: candidate backend for ACT-style imitation policies. It may use
+  official or ground-truth demonstrations during training, but only legal
+  observation/action inputs may reach live runtime.
+- `open_vla` and `pi0`: candidate VLA-style backends only when their live
+  policy artifact is deterministic enough for the AIC runtime contract and does
+  not include an online language-model control loop.
+- `cosmos_reason_critic`: offline labeler, planner, critic, or synthetic-data
+  assistant by default. Cosmos/VLM outputs may inform reports, labels, dataset
+  curation, or experiment selection; they are not live robot controllers unless
+  compiled into deterministic, tested policy artifacts that consume only legal
+  observations.
+- `classical_servo`: legal live policy candidate when it uses legal observation
+  and controller signals.
+- `custom`: allowed only with explicit runtime role, leakage class, and
+  provenance.
+
+Live learned or reasoning backends (`isaac_rl`, `lerobot_act`,
+`lewm_world_model`, `open_vla`, and `pi0`) must bind their compiled policy
+artifact into the runtime-boundary proof. Free-form config is not enough to make
+the live checkpoint auditable.
+Backend-specific config must not introduce a second policy-artifact path or URI.
+Checkpoint, weights, policy path, and model path aliases belong in typed artifact
+references rather than top-level or nested backend config.
+Split aliases such as `policy.path`, `model.uri`, or `artifacts.policy` are the
+same policy-artifact ownership bug.
+Unknown schema fields fail closed instead of being silently dropped.
+
+RSL-RL belongs in the training path for Isaac Lab RL candidates. ACT belongs in
+the imitation-learning policy family. VLA models belong in the candidate policy
+family only after the runtime boundary is explicit. Cosmos and other VLMs belong
+outside the live control path unless their outputs have been compiled into
+deterministic policy artifacts and screened like any other backend.
 
 ## Bootstrap Strategy
 
@@ -226,12 +290,22 @@ behavior. It should not become the canonical AIC episode format.
 
 ## Build
 
-Create a neutral package:
+Create a neutral top-level package. The first slice should be small and
+dependency-light:
 
 ```text
 aic_signal_harness/
   __init__.py
   schemas.py
+  test/
+    test_schemas.py
+```
+
+Later slices can add reducers, gates, reports, and narrow CLI entry points only
+when those contracts exist:
+
+```text
+aic_signal_harness/
   artifacts.py
   manifest.py
   scoring.py
@@ -246,7 +320,7 @@ aic_signal_harness/
     failure_labeler.py
     next_experiment.py
   gates.py
-  cli.py
+  cli.py  # only for explicit validate/reduce/label/gate commands
 ```
 
 The package should avoid ROS imports unless a reducer requires them. This keeps
@@ -276,7 +350,9 @@ The first schema pass should define these objects:
 
 ## Execution Plan
 
-1. Create `aic_signal_harness` with schemas and CLI skeleton.
+1. Create `aic_signal_harness` with backend-neutral schemas, JSON helpers, and
+   validation tests. Do not add a CLI before there is a concrete command
+   contract.
 
 2. Move or wrap reusable logic from `aic_lewm_policy.experiment_harness`:
    dataset validation, scoring parsing, manifests, ledgers, and promotion gates.
@@ -364,8 +440,6 @@ schema, reducer, test, gate, or executable report.
 
 ## Open Questions
 
-- Should the neutral harness live as a top-level package or under
-  `aic_lewm_policy` during the first extraction?
 - Should policy trace JSONL be written from every backend immediately, or only
   from the active experimental backend first?
 - Which shaped reward terms should be allowed to influence planning before they
