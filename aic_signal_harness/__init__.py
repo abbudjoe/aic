@@ -10,6 +10,12 @@ from aic_signal_harness.artifacts import (
     sha256_file,
     write_json,
 )
+from aic_signal_harness.episode_trace import (
+    EpisodeTrace,
+    TimelineEvent,
+    TimelineEventKind,
+    TrialTrace,
+)
 from aic_signal_harness.hdf5_dataset import (
     Hdf5DatasetReport,
     Hdf5DatasetStats,
@@ -62,6 +68,7 @@ from aic_signal_harness.failure import (
     FailureSeverity,
 )
 from aic_signal_harness.reducers import (
+    EpisodeTrainingSignalReduction,
     Hdf5DatasetReduction,
     McapEvalReduction,
     PolicyTraceReduction,
@@ -71,9 +78,12 @@ from aic_signal_harness.reducers import (
     analyze_policy_trace_jsonl,
     attach_scoring_yaml_reduction,
     build_ledger_entry,
+    derive_episode_trace,
     derive_next_experiment_report,
     derive_reward_failure_reports,
+    derive_training_signal_report,
     promote_ledger_entry,
+    read_policy_trace_events,
     reduce_policy_trace_jsonl,
     reduce_mcap_eval_bundle,
     reduce_hdf5_dataset,
@@ -97,10 +107,17 @@ from aic_signal_harness.schemas import (
     utc_now_iso,
 )
 from aic_signal_harness.scoring import ScoreReport, TrialScore, parse_scoring_yaml
+from aic_signal_harness.training_signal import (
+    TrainingSignal,
+    TrainingSignalKind,
+    TrainingSignalReport,
+)
 
 __all__ = [
     "ArtifactRef",
     "BackendKind",
+    "EpisodeTrace",
+    "EpisodeTrainingSignalReduction",
     "ExperimentSpec",
     "FailureKind",
     "FailureLabel",
@@ -151,21 +168,30 @@ __all__ = [
     "RuntimeRole",
     "SchemaValidationError",
     "SimulatorKind",
+    "TimelineEvent",
+    "TimelineEventKind",
     "TrainingSourceKind",
+    "TrainingSignal",
+    "TrainingSignalKind",
+    "TrainingSignalReport",
     "TrialScore",
+    "TrialTrace",
     "analyze_mcap_eval_bundle",
     "analyze_policy_trace_jsonl",
     "append_ledger_entry",
     "attach_scoring_yaml_reduction",
     "backfill_legacy_replay_policy_eval",
     "build_ledger_entry",
+    "derive_episode_trace",
     "derive_next_experiment_report",
     "derive_reward_failure_reports",
+    "derive_training_signal_report",
     "experiment_spec_from_json",
     "experiment_spec_to_json",
     "LegacyRunBackfill",
     "parse_scoring_yaml",
     "promote_ledger_entry",
+    "read_policy_trace_events",
     "read_ledger_entries",
     "read_json",
     "read_promotion_decision",

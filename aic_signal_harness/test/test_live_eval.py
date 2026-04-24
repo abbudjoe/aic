@@ -127,6 +127,8 @@ def test_finalize_live_eval_run_writes_neutral_harness_artifacts(tmp_path: Path)
         harness_root / "scoring_yaml_artifact.json",
         harness_root / "policy_trace_report.json",
         harness_root / "policy_trace_artifact.json",
+        harness_root / "episode_trace.json",
+        harness_root / "training_signal_report.json",
         harness_root / "run_manifest.json",
         harness_root / "promotion_report.json",
         harness_root / "reward_report.json",
@@ -146,8 +148,22 @@ def test_finalize_live_eval_run_writes_neutral_harness_artifacts(tmp_path: Path)
     }
     assert len(read_ledger_entries(ledger_path)) == 1
     assert PromotionDecision.from_dict(read_json(baseline_path)).decision.value == "bootstrap"
+    episode_trace = read_json(harness_root / "episode_trace.json")
+    assert episode_trace["run_id"] == "live-run-a"
+    assert episode_trace["trials"][0]["event_count"] == 2
+    training_signals = read_json(harness_root / "training_signal_report.json")
+    assert training_signals["source_trace"]["kind"] == "episode_trace"
+    assert {signal["kind"] for signal in training_signals["signals"]} >= {
+        "official_score_term",
+        "reward_term",
+        "failure_label",
+    }
     summary = read_json(harness_root / "live_eval_summary.json")
     assert summary["next_experiment_path"] == str(harness_root / "next_experiment.json")
+    assert summary["episode_trace_path"] == str(harness_root / "episode_trace.json")
+    assert summary["training_signal_report_path"] == str(
+        harness_root / "training_signal_report.json"
+    )
 
 
 def test_finalize_live_eval_run_rejects_missing_declared_baseline(tmp_path: Path) -> None:
@@ -357,4 +373,8 @@ def test_finalize_live_eval_run_can_skip_next_experiment_without_promotion(
 
     assert finalization.manifest.backend.backend_kind is BackendKind.replay_servo
     assert finalization.next_experiment_path is None
+    assert finalization.episode_trace_path is None
+    assert finalization.training_signal_report_path is None
     assert not (harness_root / "next_experiment.json").exists()
+    assert not (harness_root / "episode_trace.json").exists()
+    assert not (harness_root / "training_signal_report.json").exists()

@@ -5,6 +5,11 @@ from aic_signal_harness.reducers.hdf5_dataset import (
     reduce_hdf5_dataset,
     validate_hdf5_dataset,
 )
+from aic_signal_harness.reducers.episode_trace import (
+    EpisodeTrainingSignalReduction,
+    derive_episode_trace,
+    derive_training_signal_report,
+)
 from aic_signal_harness.reducers.ledger import build_ledger_entry
 from aic_signal_harness.reducers.mcap_eval import (
     McapEvalReduction,
@@ -15,6 +20,7 @@ from aic_signal_harness.reducers.next_experiment import derive_next_experiment_r
 from aic_signal_harness.reducers.policy_trace import (
     PolicyTraceReduction,
     analyze_policy_trace_jsonl,
+    read_policy_trace_events,
     reduce_policy_trace_jsonl,
 )
 from aic_signal_harness.reducers.promotion import promote_ledger_entry
@@ -30,6 +36,7 @@ from aic_signal_harness.reducers.scoring_yaml import (
 
 __all__ = [
     "Hdf5DatasetReduction",
+    "EpisodeTrainingSignalReduction",
     "McapEvalReduction",
     "PolicyTraceReduction",
     "RewardFailureReduction",
@@ -38,9 +45,12 @@ __all__ = [
     "analyze_policy_trace_jsonl",
     "attach_scoring_yaml_reduction",
     "build_ledger_entry",
+    "derive_episode_trace",
     "derive_next_experiment_report",
     "derive_reward_failure_reports",
+    "derive_training_signal_report",
     "promote_ledger_entry",
+    "read_policy_trace_events",
     "reduce_policy_trace_jsonl",
     "reduce_mcap_eval_bundle",
     "reduce_hdf5_dataset",

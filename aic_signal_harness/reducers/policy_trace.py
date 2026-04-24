@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
@@ -26,6 +26,7 @@ class PolicyTraceReduction:
 
     artifact: ArtifactRef
     report: PolicyTraceReport
+    events: tuple[PolicyTraceEvent, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -33,6 +34,8 @@ class PolicyTraceReduction:
             errors.append("policy trace reduction artifact must be an ArtifactRef")
         if not isinstance(self.report, PolicyTraceReport):
             errors.append("policy trace reduction report must be a PolicyTraceReport")
+        if not isinstance(self.events, tuple):
+            errors.append("policy trace reduction events must be a tuple")
         if errors:
             raise HarnessIOError("; ".join(errors))
         if self.artifact.kind != "policy_trace_jsonl":
@@ -43,6 +46,11 @@ class PolicyTraceReduction:
             errors.append("policy trace reduction artifact.path must match report.source")
         if self.artifact.sha256 is not None and self.artifact.sha256 != sha256_file(self.report.source):
             errors.append("policy trace reduction artifact.sha256 must match source file")
+        if self.events:
+            if self.events[0].run_id != self.report.run_id:
+                errors.append("policy trace reduction events must match report.run_id")
+            if len(self.events) != self.report.event_count:
+                errors.append("policy trace reduction events must match report.event_count")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -55,8 +63,7 @@ def analyze_policy_trace_jsonl(
     """Analyze a policy trace JSONL file into a deterministic typed report."""
 
     trace_path = _resolve_existing_file(path)
-    events = _read_trace_events(trace_path)
-    _validate_event_sequence(events, trace_path)
+    events = read_policy_trace_events(trace_path)
     reduced_at = events[-1].emitted_at_utc if reduced_at_utc is None else reduced_at_utc
     return _report_from_events(
         source=str(trace_path),
@@ -76,7 +83,13 @@ def reduce_policy_trace_jsonl(
 
     trace_path = _resolve_existing_file(path)
     before = _stat_snapshot(trace_path)
-    report = analyze_policy_trace_jsonl(trace_path, reduced_at_utc=reduced_at_utc)
+    events = read_policy_trace_events(trace_path)
+    reduced_at = events[-1].emitted_at_utc if reduced_at_utc is None else reduced_at_utc
+    report = _report_from_events(
+        source=str(trace_path),
+        events=events,
+        reduced_at_utc=reduced_at,
+    )
     digest = sha256_file(trace_path)
     after = _stat_snapshot(trace_path)
     _assert_same_file_identity(
@@ -94,7 +107,17 @@ def reduce_policy_trace_jsonl(
             provenance={} if provenance is None else provenance,
         ),
         report=report,
+        events=events,
     )
+
+
+def read_policy_trace_events(path: str | Path) -> tuple[PolicyTraceEvent, ...]:
+    """Read and validate policy trace JSONL events without reducing them."""
+
+    trace_path = _resolve_existing_file(path)
+    events = _read_trace_events(trace_path)
+    _validate_event_sequence(events, trace_path)
+    return events
 
 
 def _read_trace_events(path: Path) -> tuple[PolicyTraceEvent, ...]:

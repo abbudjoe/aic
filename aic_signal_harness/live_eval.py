@@ -26,8 +26,10 @@ from aic_signal_harness.reducers import (
     PolicyTraceReduction,
     attach_scoring_yaml_reduction,
     build_ledger_entry,
+    derive_episode_trace,
     derive_next_experiment_report,
     derive_reward_failure_reports,
+    derive_training_signal_report,
     promote_ledger_entry,
     reduce_policy_trace_jsonl,
     reduce_scoring_yaml,
@@ -120,6 +122,8 @@ class LiveEvalFinalization:
     summary_path: Path
     policy_trace_report_path: Path | None = None
     policy_trace_artifact_path: Path | None = None
+    episode_trace_path: Path | None = None
+    training_signal_report_path: Path | None = None
     promotion_path: Path | None = None
     next_experiment_path: Path | None = None
     ledger_path: Path | None = None
@@ -135,6 +139,8 @@ class LiveEvalFinalization:
             "scoring_artifact_path": str(self.scoring_artifact_path),
             "policy_trace_report_path": _optional_path(self.policy_trace_report_path),
             "policy_trace_artifact_path": _optional_path(self.policy_trace_artifact_path),
+            "episode_trace_path": _optional_path(self.episode_trace_path),
+            "training_signal_report_path": _optional_path(self.training_signal_report_path),
             "ledger_entry_path": str(self.ledger_entry_path),
             "ledger_path": _optional_path(self.ledger_path),
             "promotion_path": _optional_path(self.promotion_path),
@@ -205,6 +211,12 @@ def finalize_live_eval_run(
     policy_trace_artifact_path = (
         None if policy_trace_reduction is None else harness_root / "policy_trace_artifact.json"
     )
+    episode_trace_path = (
+        None if policy_trace_reduction is None else harness_root / "episode_trace.json"
+    )
+    training_signal_report_path = (
+        None if policy_trace_reduction is None else harness_root / "training_signal_report.json"
+    )
     manifest_path = harness_root / "run_manifest.json"
     promotion_path = (
         harness_root / "promotion_report.json"
@@ -226,6 +238,8 @@ def finalize_live_eval_run(
             scoring_artifact_path,
             policy_trace_report_path,
             policy_trace_artifact_path,
+            episode_trace_path,
+            training_signal_report_path,
             manifest_path,
             promotion_path,
             reward_report_path,
@@ -324,6 +338,35 @@ def finalize_live_eval_run(
         reward_failure.failure_report.to_dict(),
         overwrite=overwrite,
     )
+    if policy_trace_reduction is not None:
+        assert episode_trace_path is not None
+        assert training_signal_report_path is not None
+        episode_trace = derive_episode_trace(
+            run_id=run_id,
+            policy_events=policy_trace_reduction.events,
+            source_artifacts=(scoring_reduction.artifact, policy_trace_reduction.artifact),
+            score_report=scoring_reduction.score,
+            reward_report=reward_failure.reward_report,
+            failure_report=reward_failure.failure_report,
+            generated_at_utc=generated_at,
+        )
+        write_json(episode_trace_path, episode_trace.to_dict(), overwrite=overwrite)
+        episode_trace_artifact = ArtifactRef(
+            kind="episode_trace",
+            path=str(episode_trace_path),
+            sha256=sha256_file(episode_trace_path),
+            provenance={"producer": "aic_signal_harness.live_eval", "run_id": run_id},
+        )
+        training_signal_report = derive_training_signal_report(
+            episode_trace=episode_trace,
+            source_trace=episode_trace_artifact,
+            generated_at_utc=generated_at,
+        )
+        write_json(
+            training_signal_report_path,
+            training_signal_report.to_dict(),
+            overwrite=overwrite,
+        )
 
     if write_next_experiment:
         assert next_experiment_path is not None
@@ -357,6 +400,8 @@ def finalize_live_eval_run(
         scoring_artifact_path=scoring_artifact_path,
         policy_trace_report_path=policy_trace_report_path,
         policy_trace_artifact_path=policy_trace_artifact_path,
+        episode_trace_path=episode_trace_path,
+        training_signal_report_path=training_signal_report_path,
         ledger_entry_path=ledger_entry_path,
         ledger_path=typed_ledger_path,
         promotion_path=promotion_path,

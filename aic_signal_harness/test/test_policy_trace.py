@@ -186,6 +186,8 @@ def test_reduce_policy_trace_jsonl_binds_artifact_identity(tmp_path: Path) -> No
         provenance={"producer": "pytest"},
     )
     assert reduction.report.reduced_at_utc == "2026-04-23T00:00:00Z"
+    assert len(reduction.events) == 1
+    assert reduction.events[0].run_id == reduction.report.run_id
 
 
 def test_reduce_policy_trace_jsonl_rejects_source_mutation_during_reduction(

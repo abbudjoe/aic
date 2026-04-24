@@ -112,6 +112,7 @@ official evaluator exits. The finalizer writes typed harness outputs under
 - `run_manifest.json`
 - `score_report.json`
 - `policy_trace_report.json` and `policy_trace_artifact.json` when tracing is enabled
+- `episode_trace.json` and `training_signal_report.json` when tracing is enabled
 - `reward_report.json` and `failure_report.json`
 - `promotion_report.json` when `AIC_HARNESS_BASELINE_PATH` or
   `AIC_HARNESS_BOOTSTRAP_PROMOTION=1` is set

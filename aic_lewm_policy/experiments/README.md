@@ -48,4 +48,5 @@ PYTHONPATH=. "$HARNESS_PY" -m aic_signal_harness.live_eval finalize \
 ```
 
 This writes the neutral `run_manifest.json`, reward/failure reports,
-`next_experiment.json`, and ledger entry from official eval evidence.
+`episode_trace.json`, `training_signal_report.json`, `next_experiment.json`,
+and ledger entry from official eval evidence.
