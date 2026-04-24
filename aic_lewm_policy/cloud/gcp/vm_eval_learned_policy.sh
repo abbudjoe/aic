@@ -7,6 +7,25 @@ AIC_EVAL_IMAGE="${AIC_EVAL_IMAGE:-ghcr.io/intrinsic-dev/aic/aic_eval:latest}"
 AIC_EVAL_TIMEOUT_SEC="${AIC_EVAL_TIMEOUT_SEC:-1800}"
 
 RESULT_ROOT="${AIC_EVAL_RESULT_ROOT:-$HOME/aic_results/$AIC_EVAL_RUN_ID}"
+HARNESS_ROOT="$RESULT_ROOT/harness"
+POLICY_TRACE_CONTAINER_PATH="${AIC_LEWM_POLICY_TRACE_CONTAINER_PATH:-/aic_results/harness/policy_trace.jsonl}"
+POLICY_TRACE_CONTAINER_PREFIX="/aic_results/harness/"
+if [[ "$POLICY_TRACE_CONTAINER_PATH" != "$POLICY_TRACE_CONTAINER_PREFIX"* ]]; then
+  echo "AIC_LEWM_POLICY_TRACE_CONTAINER_PATH must live under $POLICY_TRACE_CONTAINER_PREFIX" >&2
+  exit 2
+fi
+POLICY_TRACE_RELATIVE_PATH="${POLICY_TRACE_CONTAINER_PATH#"$POLICY_TRACE_CONTAINER_PREFIX"}"
+case "/$POLICY_TRACE_RELATIVE_PATH/" in
+  */../* | */./* | *//*)
+    echo "AIC_LEWM_POLICY_TRACE_CONTAINER_PATH must not contain relative path segments" >&2
+    exit 2
+    ;;
+esac
+if [[ -z "$POLICY_TRACE_RELATIVE_PATH" ]]; then
+  echo "AIC_LEWM_POLICY_TRACE_CONTAINER_PATH must name a JSONL file" >&2
+  exit 2
+fi
+POLICY_TRACE_HOST_PATH="$HARNESS_ROOT/$POLICY_TRACE_RELATIVE_PATH"
 # Docker network DNS labels have practical length limits; keep the full run id
 # for result paths, but use a short deterministic alias for container hostnames.
 SAFE_PREFIX="$(printf '%s' "$AIC_EVAL_RUN_ID" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-36)"
@@ -34,7 +53,7 @@ if [[ "${AIC_EVAL_USE_LOCAL_LAUNCH:-1}" != "0" ]]; then
   fi
 fi
 
-mkdir -p "$RESULT_ROOT/eval"
+mkdir -p "$RESULT_ROOT/eval" "$HARNESS_ROOT"
 
 cleanup() {
   set +e
@@ -77,10 +96,14 @@ sudo docker run -d \
   --name "$MODEL_CONTAINER" \
   "${DOCKER_GPU_ARGS[@]}" \
   --network "$NETWORK_NAME" \
+  -v "$HARNESS_ROOT:/aic_results/harness" \
   -e RMW_IMPLEMENTATION=rmw_zenoh_cpp \
   -e ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
 	  -e AIC_ROUTER_ADDR="$EVAL_CONTAINER:7447" \
 	  -e AIC_MODEL_PASSWD=CHANGE_IN_PROD \
+	  -e AIC_EVAL_RUN_ID="$AIC_EVAL_RUN_ID" \
+	  -e AIC_LEWM_POLICY_TRACE_PATH="$POLICY_TRACE_CONTAINER_PATH" \
+	  -e AIC_LEWM_POLICY_TRACE_RUN_ID="$AIC_EVAL_RUN_ID" \
 	  -e AIC_LEWM_PLANNER_MODE="${AIC_LEWM_PLANNER_MODE:-lewm_mpc}" \
 	  -e AIC_LEWM_DEVICE="${AIC_LEWM_DEVICE:-cpu}" \
 	  -e AIC_LEWM_REQUIRE_CHECKPOINT="${AIC_LEWM_REQUIRE_CHECKPOINT:-1}" \
@@ -126,7 +149,50 @@ if [[ "$eval_exit_code" != "0" ]]; then
   exit "$eval_exit_code"
 fi
 
+POLICY_TRACE_REQUIRED="${AIC_LEWM_POLICY_TRACE_REQUIRED:-1}"
+if [[ "$POLICY_TRACE_REQUIRED" != "0" && "$POLICY_TRACE_REQUIRED" != "false" ]]; then
+  if [[ ! -s "$POLICY_TRACE_HOST_PATH" ]]; then
+    echo "Missing required policy trace JSONL: $POLICY_TRACE_HOST_PATH" >&2
+    exit 2
+  fi
+fi
+
+if [[ -s "$POLICY_TRACE_HOST_PATH" ]]; then
+  export AIC_POLICY_TRACE_HOST_PATH="$POLICY_TRACE_HOST_PATH"
+  export AIC_POLICY_TRACE_REPORT_PATH="$HARNESS_ROOT/policy_trace_report.json"
+  export AIC_POLICY_TRACE_ARTIFACT_PATH="$HARNESS_ROOT/policy_trace_artifact.json"
+  export AIC_POLICY_TRACE_RUN_ID="$AIC_EVAL_RUN_ID"
+  PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
+import os
+
+from aic_signal_harness import reduce_policy_trace_jsonl, write_json
+
+trace_path = os.environ["AIC_POLICY_TRACE_HOST_PATH"]
+report_path = os.environ["AIC_POLICY_TRACE_REPORT_PATH"]
+artifact_path = os.environ["AIC_POLICY_TRACE_ARTIFACT_PATH"]
+run_id = os.environ["AIC_POLICY_TRACE_RUN_ID"]
+reduction = reduce_policy_trace_jsonl(
+    trace_path,
+    provenance={
+        "producer": "aic_lewm_policy/cloud/gcp/vm_eval_learned_policy.sh",
+        "run_id": run_id,
+    },
+)
+write_json(report_path, reduction.report.to_dict(), overwrite=True)
+write_json(artifact_path, reduction.artifact.to_dict(), overwrite=True)
+PY
+fi
+
 echo "AIC_EVAL_RESULT_ROOT=$RESULT_ROOT"
 if [[ -f "$RESULT_ROOT/eval/scoring.yaml" ]]; then
   echo "AIC_EVAL_SCORING_PATH=$RESULT_ROOT/eval/scoring.yaml"
+fi
+if [[ -f "$POLICY_TRACE_HOST_PATH" ]]; then
+  echo "AIC_POLICY_TRACE_PATH=$POLICY_TRACE_HOST_PATH"
+fi
+if [[ -f "$HARNESS_ROOT/policy_trace_report.json" ]]; then
+  echo "AIC_POLICY_TRACE_REPORT_PATH=$HARNESS_ROOT/policy_trace_report.json"
+fi
+if [[ -f "$HARNESS_ROOT/policy_trace_artifact.json" ]]; then
+  echo "AIC_POLICY_TRACE_ARTIFACT_PATH=$HARNESS_ROOT/policy_trace_artifact.json"
 fi
