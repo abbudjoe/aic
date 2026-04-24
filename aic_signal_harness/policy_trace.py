@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from enum import Enum
 from types import MappingProxyType
@@ -17,6 +18,7 @@ _POLICY_TRACE_EVENT_KEYS = frozenset(
         "schema_version",
         "run_id",
         "trial_id",
+        "official_trial_id",
         "event_index",
         "event_type",
         "elapsed_sec",
@@ -56,6 +58,7 @@ _POLICY_TRACE_REPORT_KEYS = frozenset(
     }
 )
 _ACTION_EVENT_TYPES = frozenset({"action_selected", "action_published"})
+_OFFICIAL_TRIAL_ID_RE = re.compile(r"^trial_[1-9][0-9]*$")
 
 
 class _StrEnum(str, Enum):
@@ -105,6 +108,7 @@ class PolicyTraceEvent:
     leakage_class: LeakageClass
     payload: Mapping[str, Any] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
+    official_trial_id: str | None = None
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -119,6 +123,17 @@ class PolicyTraceEvent:
                 )
             except HarnessIOError as exc:
                 errors.append(str(exc))
+        try:
+            object.__setattr__(
+                self,
+                "official_trial_id",
+                _optional_official_trial_id(
+                    self.official_trial_id,
+                    "policy trace event.official_trial_id",
+                ),
+            )
+        except HarnessIOError as exc:
+            errors.append(str(exc))
         try:
             object.__setattr__(
                 self,
@@ -158,11 +173,15 @@ class PolicyTraceEvent:
             errors.append(str(exc))
         if not errors and self.event_type.value in _ACTION_EVENT_TYPES:
             errors.extend(_action_payload_errors(self.payload, "policy trace action payload"))
+            if self.leakage_class is not LeakageClass.legal_policy_action_output:
+                errors.append(
+                    "policy trace action events must use legal_policy_action_output leakage_class"
+                )
         if errors:
             raise HarnessIOError("; ".join(errors))
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        value: dict[str, Any] = {
             "schema_version": self.schema_version,
             "run_id": self.run_id,
             "trial_id": self.trial_id,
@@ -174,6 +193,9 @@ class PolicyTraceEvent:
             "leakage_class": self.leakage_class.value,
             "payload": _thaw_json(self.payload),
         }
+        if self.official_trial_id is not None:
+            value["official_trial_id"] = self.official_trial_id
+        return value
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "PolicyTraceEvent":
@@ -191,6 +213,7 @@ class PolicyTraceEvent:
             source=cast(Any, value.get("source")),
             leakage_class=cast(Any, value.get("leakage_class")),
             payload=value.get("payload", {}),
+            official_trial_id=value.get("official_trial_id"),
         )
 
 
@@ -453,6 +476,15 @@ def _require_nonempty_text(value: Any, field_name: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise HarnessIOError(f"{field_name} must be a nonempty string")
     return value
+
+
+def _optional_official_trial_id(value: Any, field_name: str) -> str | None:
+    if value is None:
+        return None
+    trial_id = _require_nonempty_text(value, field_name)
+    if not _OFFICIAL_TRIAL_ID_RE.match(trial_id):
+        raise HarnessIOError(f"{field_name} must be an official trial_* id")
+    return trial_id
 
 
 def _require_nonnegative_int(value: Any, field_name: str) -> int:

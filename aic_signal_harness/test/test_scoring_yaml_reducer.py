@@ -1,4 +1,3 @@
-import hashlib
 from pathlib import Path
 
 import pytest
@@ -121,13 +120,42 @@ def test_reduce_scoring_yaml_captures_digest_and_metadata(tmp_path: Path) -> Non
     )
 
 
-def test_reduce_scoring_yaml_binds_digest_and_score_to_same_loaded_bytes(
+def test_reduce_scoring_yaml_rejects_split_path_file_uri_identity(tmp_path: Path) -> None:
+    scoring = tmp_path / "eval" / "scoring.yaml"
+    other_scoring = tmp_path / "other" / "scoring.yaml"
+    scoring.parent.mkdir()
+    other_scoring.parent.mkdir()
+    _write_scoring_yaml(scoring)
+    _write_scoring_yaml(other_scoring)
+
+    with pytest.raises(HarnessIOError, match="path and file URI"):
+        reduce_scoring_yaml(scoring, uri=other_scoring.as_uri())
+
+
+def test_reduce_scoring_yaml_rejects_malformed_uri_as_harness_error(
+    tmp_path: Path,
+) -> None:
+    scoring = tmp_path / "eval" / "scoring.yaml"
+    scoring.parent.mkdir()
+    _write_scoring_yaml(scoring)
+
+    for uri, message in (
+        ("not-a-uri", "URI must include a scheme"),
+        ("s3:path", "URI must include a network location"),
+        ("x:", "URI must include a network location"),
+        ("file:///tmp/%00x", "must not contain NUL"),
+        ("file:///tmp/%ZZ", "invalid percent escape"),
+    ):
+        with pytest.raises(HarnessIOError, match=message):
+            reduce_scoring_yaml(scoring, uri=uri)
+
+
+def test_reduce_scoring_yaml_rejects_file_changed_after_snapshot_read(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scoring = tmp_path / "scoring.yaml"
     _write_scoring_yaml(scoring, total=7.5)
-    expected_bytes = scoring.read_bytes()
     original_read_scoring_yaml_snapshot = scoring_yaml_reducer.read_scoring_yaml_snapshot
 
     def read_and_mutate(path: str | Path) -> tuple[bytes, str]:
@@ -141,10 +169,48 @@ def test_reduce_scoring_yaml_binds_digest_and_score_to_same_loaded_bytes(
         read_and_mutate,
     )
 
-    reduction = reduce_scoring_yaml(scoring)
+    with pytest.raises(HarnessIOError, match="sha256 must match source file"):
+        reduce_scoring_yaml(scoring)
 
-    assert reduction.artifact.sha256 == hashlib.sha256(expected_bytes).hexdigest()
-    assert reduction.score == _score_report(str(scoring), parsed_at_utc=None)
+
+def test_scoring_yaml_reduction_rejects_uri_only_decoded_nul_as_harness_error() -> None:
+    source = "file:///tmp/%00x"
+
+    with pytest.raises(SchemaValidationError, match="must not contain NUL"):
+        ArtifactRef(
+            kind="scoring_yaml",
+            uri=source,
+            sha256="a" * 64,
+        )
+
+
+def test_scoring_yaml_reduction_rejects_uri_only_invalid_escape_as_harness_error() -> None:
+    source = "file:///tmp/%ZZ"
+
+    with pytest.raises(SchemaValidationError, match="invalid percent escape"):
+        ArtifactRef(
+            kind="scoring_yaml",
+            uri=source,
+            sha256="a" * 64,
+        )
+
+
+def test_scoring_yaml_reduction_rejects_forged_local_digest(tmp_path: Path) -> None:
+    scoring = tmp_path / "scoring.yaml"
+    _write_scoring_yaml(scoring)
+    forged_sha256 = "0" * 64
+    if forged_sha256 == sha256_file(scoring):
+        forged_sha256 = "1" * 64
+
+    with pytest.raises(HarnessIOError, match="sha256 must match source file"):
+        ScoringYamlReduction(
+            artifact=ArtifactRef(
+                kind="scoring_yaml",
+                path=str(scoring),
+                sha256=forged_sha256,
+            ),
+            score=_score_report(str(scoring)),
+        )
 
 
 def test_attach_scoring_yaml_reduction_adds_score_and_artifact(tmp_path: Path) -> None:

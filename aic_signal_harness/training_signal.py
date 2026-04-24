@@ -26,6 +26,9 @@ _TRAINING_SIGNAL_KEYS = frozenset(
         "leakage_class",
         "evidence",
         "trial_id",
+        "offline_only",
+        "runtime_allowed",
+        "consumable_by_policy_runtime",
     }
 )
 _TRAINING_SIGNAL_REPORT_KEYS = frozenset(
@@ -80,6 +83,9 @@ class TrainingSignal:
     leakage_class: LeakageClass
     evidence: Mapping[str, Any] = field(default_factory=dict)
     trial_id: str | None = None
+    offline_only: bool = True
+    runtime_allowed: bool = False
+    consumable_by_policy_runtime: bool = False
 
     def __post_init__(self) -> None:
         errors: list[str] = []
@@ -127,6 +133,12 @@ class TrainingSignal:
             )
         except HarnessIOError as exc:
             errors.append(str(exc))
+        if self.offline_only is not True:
+            errors.append("training signal.offline_only must be true")
+        if self.runtime_allowed is not False:
+            errors.append("training signal.runtime_allowed must be false")
+        if self.consumable_by_policy_runtime is not False:
+            errors.append("training signal.consumable_by_policy_runtime must be false")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -138,6 +150,9 @@ class TrainingSignal:
             "source": self.source,
             "leakage_class": self.leakage_class.value,
             "evidence": _thaw_json(self.evidence),
+            "offline_only": self.offline_only,
+            "runtime_allowed": self.runtime_allowed,
+            "consumable_by_policy_runtime": self.consumable_by_policy_runtime,
         }
         if self.trial_id is not None:
             value["trial_id"] = self.trial_id
@@ -148,6 +163,20 @@ class TrainingSignal:
         if not isinstance(value, Mapping):
             raise HarnessIOError("training signal must be a mapping")
         _reject_unknown_keys(value, _TRAINING_SIGNAL_KEYS, "training signal")
+        missing_runtime_fields = sorted(
+            field_name
+            for field_name in (
+                "consumable_by_policy_runtime",
+                "offline_only",
+                "runtime_allowed",
+            )
+            if field_name not in value
+        )
+        if missing_runtime_fields:
+            raise HarnessIOError(
+                "training signal missing required runtime boundary fields: "
+                + ", ".join(missing_runtime_fields)
+            )
         return cls(
             kind=cast(Any, value.get("kind")),
             target=cast(Any, value.get("target")),
@@ -156,6 +185,12 @@ class TrainingSignal:
             leakage_class=cast(Any, value.get("leakage_class")),
             evidence=value.get("evidence", {}),
             trial_id=value.get("trial_id"),
+            offline_only=cast(bool, value.get("offline_only")),
+            runtime_allowed=cast(bool, value.get("runtime_allowed")),
+            consumable_by_policy_runtime=cast(
+                bool,
+                value.get("consumable_by_policy_runtime"),
+            ),
         )
 
 
@@ -191,6 +226,8 @@ class TrainingSignalReport:
                 object.__setattr__(self, "source_trace", ArtifactRef.from_dict(self.source_trace))
             except SchemaValidationError as exc:
                 errors.append(str(exc))
+        if not errors:
+            errors.extend(_source_trace_errors(self.source_trace, self.run_id))
         try:
             object.__setattr__(
                 self,
@@ -280,14 +317,19 @@ def _as_sequence(value: Any, field_name: str) -> tuple[Any, ...]:
 def _copy_json_mapping(value: Any, field_name: str) -> MappingProxyType[str, Any]:
     if not isinstance(value, Mapping):
         raise HarnessIOError(f"{field_name} must be a mapping")
-    return MappingProxyType({str(key): _copy_json_value(item, f"{field_name}.{key}") for key, item in value.items()})
+    copied: dict[str, Any] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key.strip():
+            raise HarnessIOError(f"{field_name} keys must be nonempty strings")
+        if key in copied:
+            raise HarnessIOError(f"{field_name} has duplicate key after normalization: {key}")
+        copied[key] = _copy_json_value(item, f"{field_name}.{key}")
+    return MappingProxyType(copied)
 
 
 def _copy_json_value(value: Any, field_name: str) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType(
-            {str(key): _copy_json_value(item, f"{field_name}.{key}") for key, item in value.items()}
-        )
+        return _copy_json_mapping(value, field_name)
     if isinstance(value, (list, tuple)):
         return tuple(_copy_json_value(item, f"{field_name}[]") for item in value)
     if value is None or isinstance(value, (str, int, bool)):
@@ -299,7 +341,22 @@ def _copy_json_value(value: Any, field_name: str) -> Any:
 
 def _thaw_json(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return {str(key): _thaw_json(item) for key, item in value.items()}
+        return {key: _thaw_json(item) for key, item in value.items()}
     if isinstance(value, tuple):
         return [_thaw_json(item) for item in value]
     return value
+
+
+def _source_trace_errors(source_trace: ArtifactRef, run_id: str) -> list[str]:
+    errors: list[str] = []
+    if source_trace.kind != "episode_trace":
+        errors.append("training signal report.source_trace.kind must be 'episode_trace'")
+    if source_trace.sha256 is None:
+        errors.append("training signal report.source_trace.sha256 must be set")
+    if source_trace.provenance.get("run_id") != run_id:
+        errors.append("training signal report.source_trace provenance run_id must match report.run_id")
+    if "producer" not in source_trace.provenance:
+        errors.append("training signal report.source_trace must set provenance.producer")
+    if "derivation" not in source_trace.provenance:
+        errors.append("training signal report.source_trace must set provenance.derivation")
+    return errors

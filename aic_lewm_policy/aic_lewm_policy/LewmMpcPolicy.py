@@ -50,8 +50,10 @@ class LewmMpcPolicy(Policy):
         self._planner.reset(task_spec)
         self.get_logger().info(f"LewmMpcPolicy.insert_cable() task: {task_spec}")
         trace_trial_id = self._next_trace_trial_id(task_spec)
+        official_trial_id = self._official_trial_id_for_trace(task, trace_trial_id)
         self._emit_trace(
             trial_id=trace_trial_id,
+            official_trial_id=official_trial_id,
             event_type="task_started",
             elapsed_sec=0.0,
             payload=task_payload(task_spec),
@@ -66,12 +68,14 @@ class LewmMpcPolicy(Policy):
             )
             self._emit_trace(
                 trial_id=trace_trial_id,
+                official_trial_id=official_trial_id,
                 event_type="action_published",
                 elapsed_sec=0.0,
                 payload=action_payload(published_action),
             )
             self._emit_trace(
                 trial_id=trace_trial_id,
+                official_trial_id=official_trial_id,
                 event_type="task_finished",
                 elapsed_sec=0.0,
                 payload={"result": True, "reason": "non_positive_time_limit"},
@@ -93,6 +97,7 @@ class LewmMpcPolicy(Policy):
                 break
             self._emit_trace(
                 trial_id=trace_trial_id,
+                official_trial_id=official_trial_id,
                 event_type="observation",
                 elapsed_sec=elapsed_sec,
                 payload=observation_payload(observation),
@@ -109,6 +114,7 @@ class LewmMpcPolicy(Policy):
             )
             self._emit_trace(
                 trial_id=trace_trial_id,
+                official_trial_id=official_trial_id,
                 event_type="action_published",
                 elapsed_sec=elapsed_sec,
                 payload=action_payload(published_action),
@@ -119,6 +125,7 @@ class LewmMpcPolicy(Policy):
                 send_feedback(feedback)
                 self._emit_trace(
                     trial_id=trace_trial_id,
+                    official_trial_id=official_trial_id,
                     event_type="feedback",
                     elapsed_sec=elapsed_sec,
                     payload={"message": feedback},
@@ -142,12 +149,14 @@ class LewmMpcPolicy(Policy):
         )
         self._emit_trace(
             trial_id=trace_trial_id,
+            official_trial_id=official_trial_id,
             event_type="action_published",
             elapsed_sec=max(last_elapsed_sec, runtime_sec),
             payload=action_payload(published_final_action),
         )
         self._emit_trace(
             trial_id=trace_trial_id,
+            official_trial_id=official_trial_id,
             event_type="task_finished",
             elapsed_sec=max(last_elapsed_sec, runtime_sec),
             payload={"result": True},
@@ -183,6 +192,7 @@ class LewmMpcPolicy(Policy):
         self,
         *,
         trial_id: str,
+        official_trial_id: str | None,
         event_type: str,
         elapsed_sec: float,
         payload: dict,
@@ -192,6 +202,7 @@ class LewmMpcPolicy(Policy):
             return
         trace.emit(
             trial_id=trial_id,
+            official_trial_id=official_trial_id,
             event_type=event_type,
             elapsed_sec=elapsed_sec,
             payload=payload,
@@ -202,6 +213,20 @@ class LewmMpcPolicy(Policy):
         self._trace_trial_index = trace_index
         task_id = task_spec.task_id.strip() or "task"
         return f"{task_id}__policy_call_{trace_index:04d}"
+
+    def _official_trial_id_for_trace(
+        self,
+        task: Task,
+        trace_trial_id: str,
+    ) -> str | None:
+        trace = getattr(self, "_trace", None)
+        if trace is None:
+            return None
+        return trace.official_trial_id_for(
+            trace_trial_id=trace_trial_id,
+            policy_call_index=int(getattr(self, "_trace_trial_index", 0)),
+            task_official_trial_id=_task_official_trial_id_candidate(task),
+        )
 
     def _published_action_or_input(
         self,
@@ -239,3 +264,10 @@ def _time_seconds(time_obj) -> float:
     if seconds is not None:
         return float(seconds)
     raise TypeError(f"Unsupported ROS time type: {type(time_obj)!r}")
+
+
+def _task_official_trial_id_candidate(task: Task) -> Any | None:
+    value = getattr(task, "official_trial_id", None)
+    if value is None:
+        return None
+    return value

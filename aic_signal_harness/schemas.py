@@ -10,12 +10,14 @@ from __future__ import annotations
 import json
 import math
 import re
+import string
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping, TypeVar
-from urllib.parse import urlparse
+from typing import Any, Mapping, TypeVar, cast
+from urllib.parse import unquote, urlparse
 
 
 SCHEMA_VERSION = 1
@@ -38,7 +40,7 @@ class _StrEnum(str, Enum):
     """String-valued enum with strict parse helpers."""
 
     @classmethod
-    def parse(cls: type["_EnumT"], value: str | "_EnumT") -> "_EnumT":
+    def parse(cls: type["_EnumT"], value: Any) -> "_EnumT":
         if isinstance(value, cls):
             return value
         if not isinstance(value, str):
@@ -186,6 +188,7 @@ class RuntimeRole(_StrEnum):
 
 class LeakageClass(_StrEnum):
     legal_policy_input = "legal_policy_input"
+    legal_policy_action_output = "legal_policy_action_output"
     privileged_training_signal = "privileged_training_signal"
     privileged_eval_signal = "privileged_eval_signal"
     post_hoc_label = "post_hoc_label"
@@ -293,9 +296,39 @@ def _validate_uri_shape(value: str, field_name: str) -> str:
         raise SchemaValidationError(f"{field_name} must include a URI scheme")
     if parsed.scheme == "file" and not parsed.path:
         raise SchemaValidationError(f"{field_name} must include a file path")
+    if parsed.scheme == "file" and parsed.netloc not in ("", "localhost"):
+        raise SchemaValidationError(f"{field_name} file host must be empty or localhost")
+    if parsed.scheme == "file":
+        decoded_path = _decode_file_uri_path(parsed.path, field_name)
+        if not decoded_path.startswith("/"):
+            raise SchemaValidationError(f"{field_name} file path must be absolute")
     if parsed.scheme != "file" and not parsed.netloc:
         raise SchemaValidationError(f"{field_name} must include a network location")
     return value
+
+
+def _decode_file_uri_path(path: str, field_name: str) -> str:
+    _validate_percent_escapes(path, field_name)
+    try:
+        decoded_path = unquote(path, errors="strict")
+    except UnicodeDecodeError as exc:
+        raise SchemaValidationError(f"{field_name} file path has invalid percent-encoded UTF-8") from exc
+    if "\x00" in decoded_path:
+        raise SchemaValidationError(f"{field_name} file path must not contain NUL bytes")
+    return decoded_path
+
+
+def _validate_percent_escapes(value: str, field_name: str) -> None:
+    hex_digits = set(string.hexdigits)
+    index = 0
+    while True:
+        index = value.find("%", index)
+        if index == -1:
+            return
+        escape = value[index + 1 : index + 3]
+        if len(escape) != 2 or any(char not in hex_digits for char in escape):
+            raise SchemaValidationError(f"{field_name} file path has invalid percent escape")
+        index += 3
 
 
 def _as_json_sequence(value: Any, field_name: str) -> tuple[Any, ...]:
@@ -410,6 +443,11 @@ class ArtifactRef:
             errors.extend(exc.errors)
         if path is None and uri is None:
             errors.append("artifact must set path or uri")
+        if path is not None and uri is not None:
+            try:
+                _validate_path_file_uri_identity(path, uri, "artifact")
+            except SchemaValidationError as exc:
+                errors.extend(exc.errors)
 
         if self.sha256 is not None and (
             not isinstance(self.sha256, str) or not _SHA256_RE.match(self.sha256)
@@ -446,11 +484,27 @@ class ArtifactRef:
             raise SchemaValidationError("artifact must be a mapping")
         _reject_unknown_keys(value, _ARTIFACT_REF_KEYS, "artifact")
         return cls(
-            kind=value.get("kind"),
+            kind=cast(Any, value.get("kind")),
             path=value.get("path"),
             uri=value.get("uri"),
             sha256=value.get("sha256"),
             provenance=value.get("provenance", {}),
+        )
+
+
+def _validate_path_file_uri_identity(path: str, uri: str, field_name: str) -> None:
+    parsed = urlparse(uri)
+    if parsed.scheme != "file":
+        return
+    path_from_uri = Path(_decode_file_uri_path(parsed.path, f"{field_name}.uri")).expanduser()
+    try:
+        resolved_path = Path(path).expanduser().resolve(strict=False)
+        resolved_uri_path = path_from_uri.resolve(strict=False)
+    except (OSError, ValueError) as exc:
+        raise SchemaValidationError(f"{field_name} local artifact path cannot be resolved") from exc
+    if resolved_path != resolved_uri_path:
+        raise SchemaValidationError(
+            f"{field_name}.path and file URI must refer to the same local artifact"
         )
 
 
@@ -514,9 +568,9 @@ class RuntimeBoundaryProof:
             raise SchemaValidationError("runtime_boundary must be a mapping")
         _reject_unknown_keys(value, _RUNTIME_BOUNDARY_KEYS, "runtime_boundary")
         return cls(
-            deterministic=value.get("deterministic"),
-            uses_online_language_model_control=value.get("uses_online_language_model_control"),
-            legal_observation_contract=value.get("legal_observation_contract"),
+            deterministic=cast(Any, value.get("deterministic")),
+            uses_online_language_model_control=cast(Any, value.get("uses_online_language_model_control")),
+            legal_observation_contract=cast(Any, value.get("legal_observation_contract")),
             policy_artifact=value.get("policy_artifact"),
             notes=value.get("notes", ""),
         )
@@ -673,13 +727,13 @@ class PolicyBackendSpec:
             raise SchemaValidationError("backend must be a mapping")
         _reject_unknown_keys(value, _POLICY_BACKEND_KEYS, "backend")
         return cls(
-            backend_kind=value.get("backend_kind"),
-            name=value.get("name"),
-            runtime_role=value.get("runtime_role"),
+            backend_kind=cast(Any, value.get("backend_kind")),
+            name=cast(Any, value.get("name")),
+            runtime_role=cast(Any, value.get("runtime_role")),
             training_sources=_as_json_sequence(value.get("training_sources"), "training_sources"),
             simulator_sources=_as_json_sequence(value.get("simulator_sources"), "simulator_sources"),
-            runtime_allowed=value.get("runtime_allowed"),
-            leakage_class=value.get("leakage_class"),
+            runtime_allowed=cast(Any, value.get("runtime_allowed")),
+            leakage_class=cast(Any, value.get("leakage_class")),
             runtime_boundary=(
                 RuntimeBoundaryProof.from_dict(value["runtime_boundary"])
                 if "runtime_boundary" in value
@@ -763,10 +817,10 @@ class ExperimentSpec:
             raise SchemaValidationError("experiment spec must be a mapping")
         _reject_unknown_keys(value, _EXPERIMENT_SPEC_KEYS, "experiment spec")
         return cls(
-            schema_version=value.get("schema_version"),
-            experiment_id=value.get("experiment_id"),
-            hypothesis=value.get("hypothesis"),
-            backend=PolicyBackendSpec.from_dict(value.get("backend")),
+            schema_version=cast(Any, value.get("schema_version")),
+            experiment_id=cast(Any, value.get("experiment_id")),
+            hypothesis=cast(Any, value.get("hypothesis")),
+            backend=PolicyBackendSpec.from_dict(cast(Any, value.get("backend"))),
             expected_artifacts=value.get("expected_artifacts", ()),
             created_at_utc=value.get("created_at_utc", ""),
             tags=value.get("tags", ()),

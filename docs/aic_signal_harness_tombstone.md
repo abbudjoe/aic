@@ -119,12 +119,20 @@ standalone harness can consume without hidden conversational context:
 experiment_spec.json
 run_manifest.json
 raw artifacts
-episode_trace.jsonl
+episode_trace.json
 reward_report.json
 failure_report.json
 promotion_report.json
 next_experiment.json
 ```
+
+Live-eval finalization always treats `result_root/eval/scoring.yaml` as the
+official score authority. `episode_trace.json` and
+`training_signal_report.json` are emitted only when a policy trace JSONL is
+supplied; without policy events there is no canonical policy timeline to bind.
+Training signal reports are offline-only extraction artifacts. They may include
+official score evidence, privileged evaluator signals, and post-hoc labels for
+training or diagnosis, and must not be consumed by the live policy runtime.
 
 Today, Codex plus the human operates the outer loop. Later, a standalone Codex
 harness, OpenAI Agents SDK harness, DeepAgents harness, Fawx-derived loop, or
@@ -393,7 +401,7 @@ processed end to end by the new harness:
 
 ```text
 existing raw artifacts
-  -> canonical episode_trace.jsonl
+  -> canonical episode_trace.json
   -> reward_report.json
   -> failure_report.json
   -> validated run_manifest.json

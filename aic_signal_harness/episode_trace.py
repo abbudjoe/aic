@@ -268,6 +268,24 @@ class TrialTrace:
                 errors.append("trial trace events must all match trial_id")
             if self.event_count != len(events):
                 errors.append("trial trace.event_count must match events")
+            if self.action_event_count != sum(
+                event.event_kind is TimelineEventKind.action_event for event in events
+            ):
+                errors.append("trial trace.action_event_count must match events")
+            if self.nonzero_action_event_count != sum(
+                event.event_kind is TimelineEventKind.action_event
+                and _timeline_action_payload_is_nonzero(event.payload)
+                for event in events
+            ):
+                errors.append("trial trace.nonzero_action_event_count must match events")
+            if self.safety_guard_event_count != sum(
+                event.event_kind is TimelineEventKind.safety_guard for event in events
+            ):
+                errors.append("trial trace.safety_guard_event_count must match events")
+            if self.error_event_count != sum(
+                event.event_kind is TimelineEventKind.error for event in events
+            ):
+                errors.append("trial trace.error_event_count must match events")
             if self.start_elapsed_sec > self.end_elapsed_sec:
                 errors.append("trial trace start_elapsed_sec must be <= end_elapsed_sec")
             if events:
@@ -388,8 +406,27 @@ class EpisodeTrace:
                 errors.append("episode trace trials must have unique trial_id values")
             if not self.trials:
                 errors.append("episode trace must contain at least one trial")
-            if any(event.trial_id is not None for event in self.run_events):
-                errors.append("episode trace run_events must not set trial_id")
+            errors.extend(_source_artifact_errors(self.source_artifacts, self.run_id))
+            known_trial_ids = set(trial_ids)
+            unknown_run_trial_ids = sorted(
+                {
+                    event.trial_id
+                    for event in self.run_events
+                    if event.trial_id is not None and event.trial_id not in known_trial_ids
+                }
+            )
+            if unknown_run_trial_ids:
+                errors.append(
+                    "episode trace run_events trial_id must reference a trace trial: "
+                    + ", ".join(unknown_run_trial_ids)
+                )
+            all_event_indices = tuple(
+                event.event_index
+                for trial in self.trials
+                for event in trial.events
+            ) + tuple(event.event_index for event in self.run_events)
+            if all_event_indices != tuple(range(len(all_event_indices))):
+                errors.append("episode trace event_index values must be unique, contiguous, and stored in order")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -465,14 +502,19 @@ def _as_sequence(value: Any, field_name: str) -> tuple[Any, ...]:
 def _copy_json_mapping(value: Any, field_name: str) -> MappingProxyType[str, Any]:
     if not isinstance(value, Mapping):
         raise HarnessIOError(f"{field_name} must be a mapping")
-    return MappingProxyType({str(key): _copy_json_value(item, f"{field_name}.{key}") for key, item in value.items()})
+    copied: dict[str, Any] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key.strip():
+            raise HarnessIOError(f"{field_name} keys must be nonempty strings")
+        if key in copied:
+            raise HarnessIOError(f"{field_name} has duplicate key after normalization: {key}")
+        copied[key] = _copy_json_value(item, f"{field_name}.{key}")
+    return MappingProxyType(copied)
 
 
 def _copy_json_value(value: Any, field_name: str) -> Any:
     if isinstance(value, Mapping):
-        return MappingProxyType(
-            {str(key): _copy_json_value(item, f"{field_name}.{key}") for key, item in value.items()}
-        )
+        return _copy_json_mapping(value, field_name)
     if isinstance(value, (list, tuple)):
         return tuple(_copy_json_value(item, f"{field_name}[]") for item in value)
     if value is None or isinstance(value, (str, int, bool)):
@@ -484,7 +526,62 @@ def _copy_json_value(value: Any, field_name: str) -> Any:
 
 def _thaw_json(value: Any) -> Any:
     if isinstance(value, Mapping):
-        return {str(key): _thaw_json(item) for key, item in value.items()}
+        return {key: _thaw_json(item) for key, item in value.items()}
     if isinstance(value, tuple):
         return [_thaw_json(item) for item in value]
     return value
+
+
+def _timeline_action_payload_is_nonzero(payload: Mapping[str, Any]) -> bool:
+    raw_payload = payload.get("policy_payload")
+    if not isinstance(raw_payload, Mapping):
+        return False
+    try:
+        linear = _as_vec3(raw_payload.get("linear"), "timeline action payload.linear")
+        angular = _as_vec3(raw_payload.get("angular"), "timeline action payload.angular")
+    except HarnessIOError:
+        return False
+    return any(abs(value) > 1e-12 for value in (*linear, *angular))
+
+
+def _as_vec3(value: Any, field_name: str) -> tuple[float, float, float]:
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, (list, tuple)):
+        raise HarnessIOError(f"{field_name} must be a 3-number list or tuple")
+    if len(value) != 3:
+        raise HarnessIOError(f"{field_name} must contain exactly 3 numbers")
+    return (
+        _require_finite_float(value[0], f"{field_name}[0]"),
+        _require_finite_float(value[1], f"{field_name}[1]"),
+        _require_finite_float(value[2], f"{field_name}[2]"),
+    )
+
+
+def _require_finite_float(value: Any, field_name: str) -> float:
+    if type(value) not in (float, int) or not math.isfinite(float(value)):
+        raise HarnessIOError(f"{field_name} must be a finite number")
+    return float(value)
+
+
+def _source_artifact_errors(source_artifacts: tuple[ArtifactRef, ...], run_id: str) -> list[str]:
+    errors: list[str] = []
+    if not source_artifacts:
+        return ["episode trace.source_artifacts must not be empty"]
+    artifacts_by_kind: dict[str, list[ArtifactRef]] = {}
+    for artifact in source_artifacts:
+        artifacts_by_kind.setdefault(artifact.kind, []).append(artifact)
+        if artifact.sha256 is None:
+            errors.append(f"episode trace source artifact {artifact.kind!r} must set sha256")
+        if "producer" not in artifact.provenance:
+            errors.append(f"episode trace source artifact {artifact.kind!r} must set provenance.producer")
+        if "run_id" not in artifact.provenance:
+            errors.append(f"episode trace source artifact {artifact.kind!r} must set provenance.run_id")
+        elif artifact.provenance.get("run_id") != run_id:
+            errors.append(
+                f"episode trace source artifact {artifact.kind!r} provenance.run_id must match episode trace run_id"
+            )
+    for required_kind in ("policy_trace_jsonl", "scoring_yaml"):
+        if required_kind not in artifacts_by_kind:
+            errors.append(f"episode trace.source_artifacts must include {required_kind}")
+        elif len(artifacts_by_kind[required_kind]) != 1:
+            errors.append(f"episode trace.source_artifacts must include exactly one {required_kind}")
+    return errors

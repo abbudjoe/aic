@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from aic_signal_harness import HarnessIOError, read_json, sha256_file, write_json
+from aic_signal_harness.artifacts import local_artifact_path
 
 
 def test_write_read_json_and_overwrite_contract(tmp_path: Path) -> None:
@@ -59,3 +60,27 @@ def test_sha256_file(tmp_path: Path) -> None:
     path.write_bytes(payload)
 
     assert sha256_file(path) == hashlib.sha256(payload).hexdigest()
+
+
+def test_local_artifact_path_rejects_relative_file_uri() -> None:
+    with pytest.raises(HarnessIOError, match="file URI path must be absolute"):
+        local_artifact_path(path=None, uri="file:scoring.yaml", field_name="artifact")
+
+
+def test_local_artifact_path_rejects_decoded_nul_file_uri() -> None:
+    with pytest.raises(HarnessIOError, match="must not contain NUL"):
+        local_artifact_path(path=None, uri="file:///tmp/%00x", field_name="artifact")
+
+
+def test_local_artifact_path_rejects_invalid_percent_escape() -> None:
+    with pytest.raises(HarnessIOError, match="invalid percent escape"):
+        local_artifact_path(path=None, uri="file:///tmp/%ZZ", field_name="artifact")
+
+
+def test_local_artifact_path_wraps_nul_path_identity_errors() -> None:
+    with pytest.raises(HarnessIOError, match="cannot be resolved"):
+        local_artifact_path(
+            path="/tmp/\x00x",
+            uri="file:///tmp/x",
+            field_name="artifact",
+        )

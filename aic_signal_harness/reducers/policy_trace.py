@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
-from aic_signal_harness.artifacts import HarnessIOError, sha256_file
+from aic_signal_harness.artifacts import HarnessIOError, local_artifact_path, sha256_file
 from aic_signal_harness.policy_trace import (
     PolicyTraceEvent,
     PolicyTraceEventType,
@@ -44,13 +44,40 @@ class PolicyTraceReduction:
             errors.append("policy trace reduction artifact.sha256 must be set")
         if self.artifact.path != self.report.source:
             errors.append("policy trace reduction artifact.path must match report.source")
+        try:
+            local_artifact_path(
+                path=self.artifact.path,
+                uri=self.artifact.uri,
+                field_name="policy trace reduction artifact",
+            )
+        except HarnessIOError as exc:
+            errors.append(str(exc))
         if self.artifact.sha256 is not None and self.artifact.sha256 != sha256_file(self.report.source):
             errors.append("policy trace reduction artifact.sha256 must match source file")
-        if self.events:
-            if self.events[0].run_id != self.report.run_id:
-                errors.append("policy trace reduction events must match report.run_id")
-            if len(self.events) != self.report.event_count:
+        if not self.events:
+            errors.append("policy trace reduction events must not be empty")
+        else:
+            if any(not isinstance(event, PolicyTraceEvent) for event in self.events):
+                errors.append("policy trace reduction events must be PolicyTraceEvent instances")
+            typed_events = tuple(
+                event for event in self.events if isinstance(event, PolicyTraceEvent)
+            )
+            if any(event.run_id != self.report.run_id for event in typed_events):
+                errors.append("policy trace reduction events must all match report.run_id")
+            if len(typed_events) != self.report.event_count:
                 errors.append("policy trace reduction events must match report.event_count")
+            if typed_events:
+                try:
+                    _validate_event_sequence(typed_events, Path(self.report.source))
+                except HarnessIOError as exc:
+                    errors.append(str(exc))
+                expected_report = _report_from_events(
+                    source=self.report.source,
+                    events=typed_events,
+                    reduced_at_utc=self.report.reduced_at_utc,
+                )
+                if expected_report != self.report:
+                    errors.append("policy trace reduction events must reconstruct report exactly")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -97,6 +124,11 @@ def reduce_policy_trace_jsonl(
         before,
         after,
         "policy trace JSONL changed during reduction",
+    )
+    local_artifact_path(
+        path=report.source,
+        uri=uri,
+        field_name="policy trace reduction artifact",
     )
     return PolicyTraceReduction(
         artifact=ArtifactRef(

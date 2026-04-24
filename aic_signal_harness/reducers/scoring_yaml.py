@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
-from aic_signal_harness.artifacts import HarnessIOError
+from aic_signal_harness.artifacts import HarnessIOError, local_artifact_path, sha256_file
 from aic_signal_harness.manifest import RunManifest
-from aic_signal_harness.schemas import ArtifactRef
+from aic_signal_harness.schemas import ArtifactRef, SchemaValidationError
 from aic_signal_harness.scoring import (
     ScoreReport,
     parse_scoring_yaml_bytes,
@@ -42,6 +42,21 @@ class ScoringYamlReduction:
             errors.append(
                 "scoring reduction artifact path or uri must match score.source"
             )
+        local_path: Path | None = None
+        try:
+            local_path = local_artifact_path(
+                path=self.artifact.path,
+                uri=self.artifact.uri,
+                field_name="scoring reduction artifact",
+            )
+        except HarnessIOError as exc:
+            errors.append(str(exc))
+        if local_path is not None and self.artifact.sha256 is not None:
+            try:
+                if sha256_file(local_path) != self.artifact.sha256:
+                    errors.append("scoring reduction artifact.sha256 must match source file")
+            except HarnessIOError as exc:
+                errors.append(str(exc))
 
         if errors:
             raise HarnessIOError("; ".join(errors))
@@ -57,14 +72,23 @@ def reduce_scoring_yaml(
     """Reduce official ``scoring.yaml`` into a typed score and artifact pair."""
 
     scoring_bytes, artifact_path = read_scoring_yaml_snapshot(path)
-    return ScoringYamlReduction(
-        artifact=ArtifactRef(
+    local_artifact_path(
+        path=artifact_path,
+        uri=uri,
+        field_name="scoring reduction artifact",
+    )
+    try:
+        artifact = ArtifactRef(
             kind="scoring_yaml",
             path=artifact_path,
             uri=uri,
             sha256=hashlib.sha256(scoring_bytes).hexdigest(),
             provenance={} if provenance is None else provenance,
-        ),
+        )
+    except SchemaValidationError as exc:
+        raise HarnessIOError(str(exc)) from exc
+    return ScoringYamlReduction(
+        artifact=artifact,
         score=parse_scoring_yaml_bytes(
             scoring_bytes,
             source=artifact_path,
@@ -179,17 +203,20 @@ def _merge_scoring_yaml_artifact(
             "run manifest already has conflicting scoring_yaml artifact state: kind"
         )
 
-    return ArtifactRef(
-        kind=existing.kind,
-        path=_merge_optional_artifact_field("path", existing.path, incoming.path),
-        uri=_merge_optional_artifact_field("uri", existing.uri, incoming.uri),
-        sha256=_merge_optional_artifact_field("sha256", existing.sha256, incoming.sha256),
-        provenance=_merge_json_mapping(
-            "provenance",
-            existing.provenance,
-            incoming.provenance,
-        ),
-    )
+    try:
+        return ArtifactRef(
+            kind=existing.kind,
+            path=_merge_optional_artifact_field("path", existing.path, incoming.path),
+            uri=_merge_optional_artifact_field("uri", existing.uri, incoming.uri),
+            sha256=_merge_optional_artifact_field("sha256", existing.sha256, incoming.sha256),
+            provenance=_merge_json_mapping(
+                "provenance",
+                existing.provenance,
+                incoming.provenance,
+            ),
+        )
+    except SchemaValidationError as exc:
+        raise HarnessIOError(str(exc)) from exc
 
 
 def _merge_optional_artifact_field(

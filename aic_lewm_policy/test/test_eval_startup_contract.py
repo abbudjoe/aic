@@ -53,12 +53,27 @@ def test_gcp_eval_wrapper_passes_replay_dataset_contract_to_container() -> None:
     assert "AIC_LEWM_SFP_FINAL_SERVO_LINEAR=" in launch_script
     assert "AIC_LEWM_POLICY_TRACE_PATH=" in vm_script
     assert "AIC_LEWM_POLICY_TRACE_RUN_ID=" in vm_script
+    assert "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_IDS=" in vm_script
+    assert "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP=" in vm_script
+    assert "AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID=" in vm_script
+    assert "AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID=" in launch_script
+    assert "must be set before live eval when policy trace is required" in vm_script
+    assert "trim_env_value()" in vm_script
+    assert "POLICY_TRACE_OFFICIAL_TRIAL_IDS_TRIMMED=" in vm_script
+    assert "POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP_TRIMMED=" in vm_script
+    assert "POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID_TRIMMED=" in vm_script
     assert "AIC_LEWM_POLICY_TRACE_REQUIRED=" in launch_script
+    assert "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_IDS=" in launch_script
+    assert "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP=" in launch_script
+    assert "trial_1,trial_2,trial_3" not in launch_script
+    assert "trial_1,trial_2,trial_3" not in vm_script
     assert "AIC_MODEL_IMAGE_ID=" in launch_script
     assert "AIC_HARNESS_GATE_ID=" in launch_script
     assert "AIC_HARNESS_MIN_IMPROVEMENT=" in launch_script
     assert "AIC_HARNESS_LEDGER_PATH=" in launch_script
     assert "AIC_HARNESS_BASELINE_PATH=" in launch_script
+    assert "\t" not in launch_script
+    assert "\t" not in vm_script
 
 
 def test_eval_wrapper_finalizes_live_eval_with_neutral_harness() -> None:

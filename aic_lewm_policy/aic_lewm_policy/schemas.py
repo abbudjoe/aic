@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import ClassVar, Literal, Mapping
+from typing import ClassVar, Literal, Mapping, cast
 
 import numpy as np
 
@@ -140,10 +140,13 @@ class FinalInsertionServoConfig:
             enabled=_bool_env("AIC_LEWM_FINAL_SERVO_ENABLED", False),
             duration_sec=_float_env("AIC_LEWM_FINAL_SERVO_DURATION_SEC", 1.25),
             force_guard_n=_float_env("AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N", 18.0),
-            force_guard_mode=_choice_env(
-                "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE",
-                default="absolute",
-                choices=("absolute", "delta"),
+            force_guard_mode=cast(
+                Literal["absolute", "delta"],
+                _choice_env(
+                    "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE",
+                    default="absolute",
+                    choices=("absolute", "delta"),
+                ),
             ),
             sfp=FinalServoProfile(
                 linear=_vector3_env("AIC_LEWM_SFP_FINAL_SERVO_LINEAR", (0.0, 0.0, -0.02)),

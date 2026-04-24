@@ -5,9 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import string
 import tempfile
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import unquote, urlparse
 
 
 class HarnessIOError(RuntimeError):
@@ -95,6 +97,78 @@ def sha256_file(path: str | Path) -> str:
     except OSError as exc:
         raise HarnessIOError(f"failed to read file {file_path}: {exc}") from exc
     return digest.hexdigest()
+
+
+def local_artifact_path(
+    *,
+    path: str | None,
+    uri: str | None,
+    field_name: str,
+) -> Path | None:
+    """Return the local artifact path and bind path/file:// URI when both are set."""
+
+    uri_path = file_uri_artifact_path(uri, field_name=field_name)
+    if path is not None:
+        artifact_path = Path(path).expanduser()
+        if uri_path is not None:
+            try:
+                artifact_resolved = artifact_path.resolve(strict=False)
+                uri_resolved = uri_path.resolve(strict=False)
+            except (OSError, ValueError) as exc:
+                raise HarnessIOError(f"{field_name} local artifact path cannot be resolved") from exc
+            if artifact_resolved != uri_resolved:
+                raise HarnessIOError(
+                    f"{field_name} path and file URI must refer to the same local artifact"
+                )
+        return artifact_path
+    return uri_path
+
+
+def file_uri_artifact_path(uri: str | None, *, field_name: str) -> Path | None:
+    if uri is None:
+        return None
+    if any(char.isspace() for char in uri):
+        raise HarnessIOError(f"{field_name} URI must not contain whitespace")
+    parsed = urlparse(uri)
+    if not parsed.scheme:
+        raise HarnessIOError(f"{field_name} URI must include a scheme")
+    if parsed.scheme != "file":
+        if not parsed.netloc:
+            raise HarnessIOError(f"{field_name} URI must include a network location")
+        return None
+    if not parsed.path:
+        raise HarnessIOError(f"{field_name} file URI must include a file path")
+    if parsed.netloc not in ("", "localhost"):
+        raise HarnessIOError(f"{field_name} file URI host must be empty or localhost")
+    decoded_path = _decode_file_uri_path(parsed.path, field_name)
+    file_path = Path(decoded_path).expanduser()
+    if not file_path.is_absolute():
+        raise HarnessIOError(f"{field_name} file URI path must be absolute")
+    return file_path
+
+
+def _decode_file_uri_path(path: str, field_name: str) -> str:
+    _validate_percent_escapes(path, field_name)
+    try:
+        decoded_path = unquote(path, errors="strict")
+    except UnicodeDecodeError as exc:
+        raise HarnessIOError(f"{field_name} file URI path has invalid percent-encoded UTF-8") from exc
+    if "\x00" in decoded_path:
+        raise HarnessIOError(f"{field_name} file URI path must not contain NUL bytes")
+    return decoded_path
+
+
+def _validate_percent_escapes(value: str, field_name: str) -> None:
+    hex_digits = set(string.hexdigits)
+    index = 0
+    while True:
+        index = value.find("%", index)
+        if index == -1:
+            return
+        escape = value[index + 1 : index + 3]
+        if len(escape) != 2 or any(char not in hex_digits for char in escape):
+            raise HarnessIOError(f"{field_name} file URI path has invalid percent escape")
+        index += 3
 
 
 def _validate_json_object_keys(value: Any, field_name: str) -> None:

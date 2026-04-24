@@ -8,7 +8,10 @@ evidence. It does not participate in the live policy control path.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -70,6 +73,9 @@ _RUNTIME_ENV_KEYS = (
     "AIC_LEWM_NUM_ACTION_CANDIDATES",
     "AIC_LEWM_PLANNER_MODE",
     "AIC_LEWM_PLANNING_HORIZON",
+    "AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID",
+    "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP",
+    "AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_IDS",
     "AIC_LEWM_GOAL_DATASET",
     "AIC_LEWM_REPLAY_ACTION_GAIN",
     "AIC_LEWM_REPLAY_DATASET",
@@ -180,6 +186,7 @@ def finalize_live_eval_run(
 
     run_id = _require_text(run_id, "run_id")
     result_root = _resolve_existing_dir(result_root, "result_root")
+    scoring_yaml = _resolve_bound_scoring_yaml(scoring_yaml, result_root)
     harness_root = Path(harness_root).expanduser().resolve(strict=False)
     generated_at = utc_now_iso() if generated_at_utc is None else generated_at_utc
     env = _runtime_env_from_mapping(runtime_env)
@@ -194,6 +201,7 @@ def finalize_live_eval_run(
     policy_trace_reduction = _reduce_optional_policy_trace(
         policy_trace=policy_trace,
         run_id=run_id,
+        reduced_at_utc=generated_at,
     )
     backend = _backend_spec(
         run_id=run_id,
@@ -231,6 +239,75 @@ def finalize_live_eval_run(
     ledger_entry_path = harness_root / "ledger_entry.json"
     summary_path = harness_root / "live_eval_summary.json"
     typed_ledger_path = None if ledger_path is None else Path(ledger_path).expanduser()
+    base_artifacts = (
+        (scoring_reduction.artifact,)
+        + (
+            ()
+            if policy_trace_reduction is None
+            else (policy_trace_reduction.artifact,)
+        )
+    )
+    base_manifest = RunManifest(
+        run_id=run_id,
+        status=RunStatus.completed,
+        backend=backend,
+        created_at_utc=generated_at,
+        updated_at_utc=generated_at,
+        artifacts=base_artifacts,
+        score=scoring_reduction.score,
+        experiment_id=experiment_id,
+        hypothesis=hypothesis,
+        notes=(
+            "Generated after official AIC evaluator completion; harness outputs are post-hoc evidence.",
+            f"Official eval result root: {result_root}",
+        ),
+    )
+    base_manifest = attach_scoring_yaml_reduction(
+        base_manifest,
+        scoring_reduction,
+        updated_at_utc=generated_at,
+    )
+    promotion_input_manifest_artifact = _snapshot_artifact(
+        kind="run_manifest",
+        payload=base_manifest.to_dict(),
+        run_id=run_id,
+        uri=f"memory://aic_signal_harness/live_eval/promotion_input_manifest/{run_id}",
+        provenance={
+            "producer": "aic_signal_harness.live_eval",
+            "run_id": run_id,
+            "snapshot": "pre_reward_failure_manifest",
+        },
+    )
+
+    pending_ledger_entry = build_ledger_entry(
+        base_manifest,
+        manifest_artifact=promotion_input_manifest_artifact,
+        recorded_at_utc=generated_at,
+    )
+    promotion_snapshot = _promotion_decision(
+        pending_ledger_entry,
+        baseline=baseline,
+        bootstrap_promotion=bootstrap_promotion,
+        min_improvement=min_improvement,
+        eligible_for_submission=eligible_for_submission,
+        generated_at_utc=generated_at,
+    )
+    promotion_snapshot_artifact = (
+        None
+        if promotion_snapshot is None
+        else _promotion_snapshot_artifact(promotion_snapshot)
+    )
+    accepted_baseline_update = None
+    if (
+        promotion_snapshot is not None
+        and promotion_snapshot.accepted
+        and update_baseline_path is not None
+    ):
+        accepted_baseline_update = Path(update_baseline_path).expanduser()
+        if not append_ledger or typed_ledger_path is None:
+            raise HarnessIOError("accepted baseline update requires successful ledger append")
+    if promotion_snapshot is not None and (not append_ledger or typed_ledger_path is None):
+        raise HarnessIOError("promotion decisions require successful ledger append")
     _preflight_live_eval_writes(
         run_id=run_id,
         output_paths=(
@@ -252,7 +329,38 @@ def finalize_live_eval_run(
         append_ledger=append_ledger,
         overwrite=overwrite,
     )
-
+    if accepted_baseline_update is not None:
+        _preflight_baseline_update_path_collisions(
+            accepted_baseline_update,
+            output_paths=(
+                score_report_path,
+                scoring_artifact_path,
+                policy_trace_report_path,
+                policy_trace_artifact_path,
+                episode_trace_path,
+                training_signal_report_path,
+                manifest_path,
+                promotion_path,
+                reward_report_path,
+                failure_report_path,
+                next_experiment_path,
+                ledger_entry_path,
+                summary_path,
+            ),
+            ledger_path=typed_ledger_path,
+        )
+    if promotion_snapshot is not None and promotion_path is not None:
+        _preflight_publish_target(
+            promotion_path,
+            overwrite=overwrite,
+            field_name="promotion decision path",
+        )
+    if accepted_baseline_update is not None:
+        _preflight_publish_target(
+            accepted_baseline_update,
+            overwrite=True,
+            field_name="baseline decision path",
+        )
     harness_root.mkdir(parents=True, exist_ok=True)
     write_json(score_report_path, scoring_reduction.score.to_dict(), overwrite=overwrite)
     write_json(scoring_artifact_path, scoring_reduction.artifact.to_dict(), overwrite=overwrite)
@@ -270,62 +378,9 @@ def finalize_live_eval_run(
             overwrite=overwrite,
         )
 
-    manifest = RunManifest(
-        run_id=run_id,
-        status=RunStatus.completed,
-        backend=backend,
-        created_at_utc=generated_at,
-        updated_at_utc=generated_at,
-        artifacts=(
-            (scoring_reduction.artifact,)
-            + (
-                ()
-                if policy_trace_reduction is None
-                else (policy_trace_reduction.artifact,)
-            )
-        ),
-        score=scoring_reduction.score,
-        experiment_id=experiment_id,
-        hypothesis=hypothesis,
-        notes=(
-            "Generated after official AIC evaluator completion; harness outputs are post-hoc evidence.",
-            f"Official eval result root: {result_root}",
-        ),
-    )
-    manifest = attach_scoring_yaml_reduction(
-        manifest,
-        scoring_reduction,
-        updated_at_utc=generated_at,
-    )
-    write_json(manifest_path, manifest.to_dict(), overwrite=overwrite)
-    manifest_artifact = ArtifactRef(
-        kind="run_manifest",
-        path=str(manifest_path),
-        sha256=sha256_file(manifest_path),
-        provenance={"producer": "aic_signal_harness.live_eval", "run_id": run_id},
-    )
-
-    pending_ledger_entry = build_ledger_entry(
-        manifest,
-        manifest_artifact=manifest_artifact,
-        recorded_at_utc=generated_at,
-    )
-    promotion = _promotion_decision(
-        pending_ledger_entry,
-        baseline=baseline,
-        bootstrap_promotion=bootstrap_promotion,
-        min_improvement=min_improvement,
-        eligible_for_submission=eligible_for_submission,
-        generated_at_utc=generated_at,
-    )
-    accepted_baseline_update = None
-    if promotion is not None:
-        if promotion.accepted and update_baseline_path is not None:
-            accepted_baseline_update = Path(update_baseline_path).expanduser()
-
     reward_failure = derive_reward_failure_reports(
-        manifest,
-        promotion=promotion,
+        base_manifest,
+        promotion=promotion_snapshot,
         generated_at_utc=generated_at,
     )
     write_json(
@@ -338,13 +393,61 @@ def finalize_live_eval_run(
         reward_failure.failure_report.to_dict(),
         overwrite=overwrite,
     )
+    reward_failure_source_artifact_refs = (scoring_reduction.artifact,) + (
+        ()
+        if promotion_snapshot_artifact is None
+        or promotion_snapshot is None
+        or promotion_snapshot.metric.baseline_value is None
+        else (promotion_snapshot_artifact,)
+    )
+    reward_failure_source_artifacts = tuple(
+        {
+            "kind": artifact.kind,
+            "sha256": artifact.sha256,
+        }
+        for artifact in reward_failure_source_artifact_refs
+    )
+    reward_failure_source_provenance: dict[str, Any] = {
+        "source_artifacts": list(reward_failure_source_artifacts),
+        "source_manifest_run_id": base_manifest.run_id,
+    }
+    reward_report_artifact = ArtifactRef(
+        kind="reward_report",
+        path=str(reward_report_path),
+        sha256=sha256_file(reward_report_path),
+        provenance={
+            "producer": "aic_signal_harness.live_eval",
+            "run_id": run_id,
+            "derivation": "derive_reward_failure_reports",
+            **reward_failure_source_provenance,
+        },
+    )
+    failure_report_artifact = ArtifactRef(
+        kind="failure_report",
+        path=str(failure_report_path),
+        sha256=sha256_file(failure_report_path),
+        provenance={
+            "producer": "aic_signal_harness.live_eval",
+            "run_id": run_id,
+            "derivation": "derive_reward_failure_reports",
+            **reward_failure_source_provenance,
+        },
+    )
+    report_artifacts = (reward_report_artifact, failure_report_artifact)
+    derived_artifacts: tuple[ArtifactRef, ...] = ()
     if policy_trace_reduction is not None:
         assert episode_trace_path is not None
         assert training_signal_report_path is not None
         episode_trace = derive_episode_trace(
             run_id=run_id,
             policy_events=policy_trace_reduction.events,
-            source_artifacts=(scoring_reduction.artifact, policy_trace_reduction.artifact),
+            source_artifacts=(
+                scoring_reduction.artifact,
+                policy_trace_reduction.artifact,
+                *reward_failure_source_artifact_refs[1:],
+                reward_report_artifact,
+                failure_report_artifact,
+            ),
             score_report=scoring_reduction.score,
             reward_report=reward_failure.reward_report,
             failure_report=reward_failure.failure_report,
@@ -355,7 +458,21 @@ def finalize_live_eval_run(
             kind="episode_trace",
             path=str(episode_trace_path),
             sha256=sha256_file(episode_trace_path),
-            provenance={"producer": "aic_signal_harness.live_eval", "run_id": run_id},
+            provenance={
+                "producer": "aic_signal_harness.live_eval",
+                "run_id": run_id,
+                "derivation": "derive_episode_trace",
+                "source_artifacts": [
+                    {"kind": artifact.kind, "sha256": artifact.sha256}
+                    for artifact in (
+                        scoring_reduction.artifact,
+                        policy_trace_reduction.artifact,
+                        *reward_failure_source_artifact_refs[1:],
+                        reward_report_artifact,
+                        failure_report_artifact,
+                    )
+                ],
+            },
         )
         training_signal_report = derive_training_signal_report(
             episode_trace=episode_trace,
@@ -367,6 +484,54 @@ def finalize_live_eval_run(
             training_signal_report.to_dict(),
             overwrite=overwrite,
         )
+        training_signal_report_artifact = ArtifactRef(
+            kind="training_signal_report",
+            path=str(training_signal_report_path),
+            sha256=sha256_file(training_signal_report_path),
+            provenance={
+                "producer": "aic_signal_harness.live_eval",
+                "run_id": run_id,
+                "derivation": "derive_training_signal_report",
+                "source_trace_sha256": episode_trace_artifact.sha256,
+            },
+        )
+        derived_artifacts = (episode_trace_artifact, training_signal_report_artifact)
+
+    manifest = RunManifest(
+        run_id=base_manifest.run_id,
+        status=base_manifest.status,
+        backend=base_manifest.backend,
+        created_at_utc=base_manifest.created_at_utc,
+        updated_at_utc=base_manifest.updated_at_utc,
+        artifacts=base_manifest.artifacts + report_artifacts + derived_artifacts,
+        score=base_manifest.score,
+        experiment_id=base_manifest.experiment_id,
+        hypothesis=base_manifest.hypothesis,
+        notes=base_manifest.notes,
+    )
+    write_json(manifest_path, manifest.to_dict(), overwrite=overwrite)
+    manifest_artifact = ArtifactRef(
+        kind="run_manifest",
+        path=str(manifest_path),
+        sha256=sha256_file(manifest_path),
+        provenance={"producer": "aic_signal_harness.live_eval", "run_id": run_id},
+    )
+    ledger_entry_without_promotion = build_ledger_entry(
+        manifest,
+        manifest_artifact=manifest_artifact,
+        recorded_at_utc=generated_at,
+    )
+    promotion = _promotion_decision(
+        ledger_entry_without_promotion,
+        baseline=baseline,
+        bootstrap_promotion=bootstrap_promotion,
+        min_improvement=min_improvement,
+        eligible_for_submission=eligible_for_submission,
+        generated_at_utc=generated_at,
+    )
+    accepted_baseline_update = None
+    if promotion is not None and promotion.accepted and update_baseline_path is not None:
+        accepted_baseline_update = Path(update_baseline_path).expanduser()
 
     if write_next_experiment:
         assert next_experiment_path is not None
@@ -389,9 +554,6 @@ def finalize_live_eval_run(
     )
     write_json(ledger_entry_path, ledger_entry.to_dict(), overwrite=overwrite)
 
-    if append_ledger and typed_ledger_path is not None:
-        append_ledger_entry(typed_ledger_path, ledger_entry, allow_duplicate=False)
-
     finalization = LiveEvalFinalization(
         manifest=manifest,
         manifest_artifact=manifest_artifact,
@@ -410,15 +572,48 @@ def finalize_live_eval_run(
         next_experiment_path=next_experiment_path,
         summary_path=summary_path,
     )
+    staged_promotion_path = None
+    staged_baseline_path = None
+    published_decisions: list[_PublishedDecision] = []
+    try:
+        if accepted_baseline_update is not None and promotion is not None:
+            staged_baseline_path = _stage_baseline_decision(
+                accepted_baseline_update,
+                promotion,
+            )
+        if promotion is not None and promotion_path is not None:
+            staged_promotion_path = _stage_promotion_decision(promotion_path, promotion)
+        if staged_promotion_path is not None and promotion_path is not None:
+            published_decisions.append(
+                _publish_staged_decision(
+                    staged_promotion_path,
+                    promotion_path,
+                    field_name="promotion decision",
+                )
+            )
+            staged_promotion_path = None
+        if staged_baseline_path is not None and accepted_baseline_update is not None:
+            published_decisions.append(
+                _publish_staged_decision(
+                    staged_baseline_path,
+                    accepted_baseline_update,
+                    field_name="baseline decision",
+                )
+            )
+            staged_baseline_path = None
+        if append_ledger and typed_ledger_path is not None:
+            append_ledger_entry(typed_ledger_path, ledger_entry, allow_duplicate=False)
+    except BaseException:
+        if staged_promotion_path is not None:
+            staged_promotion_path.unlink(missing_ok=True)
+        if staged_baseline_path is not None:
+            staged_baseline_path.unlink(missing_ok=True)
+        for published_decision in reversed(published_decisions):
+            published_decision.rollback()
+        raise
+    for published_decision in published_decisions:
+        published_decision.discard_backup()
     write_json(finalization.summary_path, finalization.to_summary(), overwrite=overwrite)
-    if promotion is not None and promotion_path is not None:
-        write_promotion_decision(str(promotion_path), promotion, overwrite=overwrite)
-    if accepted_baseline_update is not None and promotion is not None:
-        write_baseline_decision(
-            str(accepted_baseline_update),
-            promotion,
-            overwrite=True,
-        )
     return finalization
 
 
@@ -426,6 +621,7 @@ def _reduce_optional_policy_trace(
     *,
     policy_trace: str | Path | None,
     run_id: str,
+    reduced_at_utc: str,
 ) -> PolicyTraceReduction | None:
     if policy_trace is None:
         return None
@@ -433,6 +629,7 @@ def _reduce_optional_policy_trace(
     reduction = reduce_policy_trace_jsonl(
         trace_path,
         provenance={"producer": "aic_signal_harness.live_eval", "run_id": run_id},
+        reduced_at_utc=reduced_at_utc,
     )
     if reduction.report.run_id != run_id:
         raise HarnessIOError(
@@ -440,6 +637,19 @@ def _reduce_optional_policy_trace(
             f"does not match finalizer run_id {run_id!r}"
         )
     return reduction
+
+
+def _resolve_bound_scoring_yaml(scoring_yaml: str | Path, result_root: Path) -> Path:
+    scoring_path = Path(scoring_yaml).expanduser().resolve(strict=False)
+    expected_path = (result_root / "eval" / "scoring.yaml").resolve(strict=False)
+    if scoring_path != expected_path:
+        raise HarnessIOError(
+            "live eval scoring_yaml must be bound to result_root/eval/scoring.yaml: "
+            f"{scoring_path} != {expected_path}"
+        )
+    if not scoring_path.is_file():
+        raise HarnessIOError(f"scoring_yaml does not exist: {scoring_path}")
+    return scoring_path
 
 
 def _preflight_live_eval_writes(
@@ -458,8 +668,77 @@ def _preflight_live_eval_writes(
                 + ", ".join(str(path) for path in existing_paths)
             )
     if append_ledger and ledger_path is not None:
+        ledger_resolved = _resolved_contract_path(ledger_path, "ledger path")
+        for output_path in output_paths:
+            if output_path is None:
+                continue
+            if ledger_resolved == _resolved_contract_path(
+                output_path,
+                "live eval generated output path",
+            ):
+                raise HarnessIOError(
+                    "append ledger path must not collide with live eval generated output: "
+                    f"{ledger_path} == {output_path}"
+                )
         if any(entry.run_id == run_id for entry in read_ledger_entries(ledger_path)):
             raise HarnessIOError(f"ledger already contains run_id={run_id}")
+
+
+def _preflight_baseline_update_path_collisions(
+    baseline_path: Path,
+    *,
+    output_paths: tuple[Path | None, ...],
+    ledger_path: Path | None,
+) -> None:
+    baseline_resolved = _resolved_contract_path(
+        baseline_path,
+        "baseline decision path",
+    )
+    for output_path in output_paths:
+        if output_path is None:
+            continue
+        if baseline_resolved == _resolved_contract_path(
+            output_path,
+            "live eval generated output path",
+        ):
+            raise HarnessIOError(
+                "baseline decision path must not collide with live eval generated output: "
+                f"{baseline_path} == {output_path}"
+            )
+    if ledger_path is not None and baseline_resolved == _resolved_contract_path(
+        ledger_path,
+        "ledger path",
+    ):
+        raise HarnessIOError(
+            "baseline decision path must not collide with append ledger path: "
+            f"{baseline_path} == {ledger_path}"
+        )
+
+
+def _resolved_contract_path(path: Path, field_name: str) -> Path:
+    try:
+        return path.expanduser().resolve(strict=False)
+    except (OSError, ValueError) as exc:
+        raise HarnessIOError(f"{field_name} cannot be resolved: {path}") from exc
+
+
+def _preflight_publish_target(
+    path: Path,
+    *,
+    overwrite: bool,
+    field_name: str,
+) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise HarnessIOError(f"{field_name} parent cannot be created: {path.parent}") from exc
+    if path.exists():
+        if path.is_dir():
+            raise HarnessIOError(f"{field_name} must not be a directory: {path}")
+        if not overwrite:
+            raise HarnessIOError(
+                f"{field_name} already exists; pass overwrite=True to replace it: {path}"
+            )
 
 
 def _load_baseline_decision(
@@ -504,6 +783,157 @@ def _promotion_decision(
         notes=("Generated by live eval harness finalizer.",),
         decided_at_utc=generated_at_utc,
     )
+
+
+def _stage_promotion_decision(
+    promotion_path: Path,
+    promotion: PromotionDecision,
+) -> Path:
+    promotion_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=promotion_path.parent,
+        prefix=f".{promotion_path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        staged_path = Path(handle.name)
+    staged_path.unlink(missing_ok=True)
+    try:
+        write_promotion_decision(str(staged_path), promotion, overwrite=False)
+    except BaseException:
+        staged_path.unlink(missing_ok=True)
+        raise
+    return staged_path
+
+
+def _stage_baseline_decision(
+    baseline_path: Path,
+    promotion: PromotionDecision,
+) -> Path:
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        dir=baseline_path.parent,
+        prefix=f".{baseline_path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        staged_path = Path(handle.name)
+    staged_path.unlink(missing_ok=True)
+    try:
+        write_baseline_decision(str(staged_path), promotion, overwrite=False)
+    except BaseException:
+        staged_path.unlink(missing_ok=True)
+        raise
+    return staged_path
+
+
+@dataclass
+class _PublishedDecision:
+    target_path: Path
+    backup_path: Path | None
+    created_target: bool
+
+    def rollback(self) -> None:
+        if self.created_target:
+            self.target_path.unlink(missing_ok=True)
+            return
+        if self.backup_path is not None and self.backup_path.exists():
+            self.backup_path.replace(self.target_path)
+
+    def discard_backup(self) -> None:
+        if self.backup_path is not None:
+            self.backup_path.unlink(missing_ok=True)
+
+
+def _publish_staged_decision(
+    staged_path: Path,
+    target_path: Path,
+    *,
+    field_name: str,
+) -> _PublishedDecision:
+    backup_path = None
+    created_target = not target_path.exists()
+    try:
+        if not created_target:
+            backup_path = _temporary_sibling(target_path, suffix=".bak")
+            target_path.replace(backup_path)
+        staged_path.replace(target_path)
+    except OSError as exc:
+        staged_path.unlink(missing_ok=True)
+        if backup_path is not None and backup_path.exists():
+            try:
+                backup_path.replace(target_path)
+            except OSError as restore_exc:
+                raise HarnessIOError(
+                    f"failed to publish {field_name}: {exc}; "
+                    f"failed to restore previous target: {restore_exc}"
+                ) from exc
+        raise HarnessIOError(f"failed to publish {field_name}: {exc}") from exc
+    return _PublishedDecision(
+        target_path=target_path,
+        backup_path=backup_path,
+        created_target=created_target,
+    )
+
+
+def _temporary_sibling(path: Path, *, suffix: str) -> Path:
+    with tempfile.NamedTemporaryFile(
+        dir=path.parent,
+        prefix=f".{path.name}.",
+        suffix=suffix,
+        delete=False,
+    ) as handle:
+        temporary_path = Path(handle.name)
+    temporary_path.unlink(missing_ok=True)
+    return temporary_path
+
+
+def _promotion_snapshot_artifact(promotion: PromotionDecision) -> ArtifactRef:
+    return _snapshot_artifact(
+        kind="promotion_decision_snapshot",
+        payload=promotion.to_dict(),
+        run_id=promotion.run_id,
+        uri=(
+            "memory://aic_signal_harness/live_eval/"
+            f"promotion_decision_snapshot/{promotion.run_id}"
+        ),
+        provenance={
+            "producer": "aic_signal_harness.live_eval",
+            "run_id": promotion.run_id,
+            "derivation": "promote_ledger_entry",
+            "source_manifest_artifact": promotion.manifest.to_dict(),
+        },
+    )
+
+
+def _snapshot_artifact(
+    *,
+    kind: str,
+    payload: Mapping[str, Any],
+    run_id: str,
+    uri: str,
+    provenance: Mapping[str, Any],
+) -> ArtifactRef:
+    return ArtifactRef(
+        kind=kind,
+        uri=uri,
+        sha256=_json_mapping_sha256(payload),
+        provenance={
+            **dict(provenance),
+            "snapshot_schema": "json_object_sha256",
+            "snapshot_run_id": run_id,
+        },
+    )
+
+
+def _json_mapping_sha256(payload: Mapping[str, Any]) -> str:
+    encoded = json.dumps(
+        payload,
+        allow_nan=False,
+        indent=2,
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded + b"\n").hexdigest()
 
 
 def _backend_spec(

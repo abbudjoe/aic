@@ -229,9 +229,25 @@ def test_artifact_ref_rejects_malformed_path_uri_and_missing_location():
 
 
 def test_artifact_ref_rejects_bad_uri_shape():
-    for uri in ("not a uri", "http://", "file://"):
+    for uri in (
+        "not a uri",
+        "http://",
+        "file://",
+        "file:scoring.yaml",
+        "file://host/tmp/a",
+        "file:///tmp/%00x",
+        "file:///tmp/%ZZ",
+    ):
         with raises_schema_error() as exc_info:
             ArtifactRef(kind="policy_checkpoint", uri=uri)
+
+        assert "artifact.uri" in str(exc_info.value)
+
+
+def test_artifact_ref_rejects_bad_file_uri_identity_as_schema_error():
+    for uri in ("file:///tmp/%00x", "file:///tmp/%ZZ"):
+        with raises_schema_error() as exc_info:
+            ArtifactRef(kind="policy_checkpoint", path="/tmp/x", uri=uri)
 
         assert "artifact.uri" in str(exc_info.value)
 
@@ -244,6 +260,16 @@ def test_artifact_ref_accepts_supported_uri_shapes():
         "file:///tmp/artifact.json",
     ):
         assert ArtifactRef(kind="policy_checkpoint", uri=uri).uri == uri
+
+
+def test_artifact_ref_rejects_split_path_file_uri_identity(tmp_path):
+    artifact_path = tmp_path / "artifact.json"
+    other_path = tmp_path / "other.json"
+
+    with raises_schema_error() as exc_info:
+        ArtifactRef(kind="run_manifest", path=str(artifact_path), uri=other_path.as_uri())
+
+    assert "path and file URI" in str(exc_info.value)
 
 
 def test_artifact_ref_rejects_malformed_sha256_with_schema_error():
