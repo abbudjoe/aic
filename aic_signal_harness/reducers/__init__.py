@@ -24,6 +24,10 @@ from aic_signal_harness.reducers.policy_trace import (
     read_policy_trace_events,
     reduce_policy_trace_jsonl,
 )
+from aic_signal_harness.reducers.policy_training import (
+    policy_checkpoint_artifact,
+    record_policy_training_run,
+)
 from aic_signal_harness.reducers.promotion import promote_ledger_entry
 from aic_signal_harness.reducers.reward_failure import (
     RewardFailureReduction,
@@ -54,7 +58,9 @@ __all__ = [
     "derive_training_dataset_report",
     "derive_training_signal_report",
     "promote_ledger_entry",
+    "policy_checkpoint_artifact",
     "read_policy_trace_events",
+    "record_policy_training_run",
     "reduce_policy_trace_jsonl",
     "reduce_mcap_eval_bundle",
     "reduce_hdf5_dataset",
