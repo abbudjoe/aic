@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -13,6 +14,7 @@ from aic_signal_harness.manifest import RunManifest
 from aic_signal_harness.schemas import ArtifactRef, SchemaValidationError
 from aic_signal_harness.scoring import (
     ScoreReport,
+    parse_scoring_yaml,
     parse_scoring_yaml_bytes,
     read_scoring_yaml_snapshot,
 )
@@ -38,6 +40,29 @@ class ScoringYamlReduction:
             errors.append("scoring reduction artifact.kind must be 'scoring_yaml'")
         if self.artifact.sha256 is None:
             errors.append("scoring reduction artifact.sha256 must be set")
+        if self.artifact.path is None:
+            errors.append("scoring reduction artifact.path must point to a local scoring.yaml snapshot")
+        expected_report_sha256 = _report_sha256(self.score.to_dict())
+        report_sha256 = self.artifact.provenance.get("report_sha256")
+        if report_sha256 != expected_report_sha256:
+            errors.append("scoring reduction artifact.provenance.report_sha256 must match score")
+        source_report = self.artifact.provenance.get("source_report")
+        if source_report is None:
+            errors.append("scoring reduction artifact.provenance.source_report must be set")
+        elif not isinstance(source_report, Mapping):
+            errors.append("scoring reduction artifact.provenance.source_report must be a mapping")
+        else:
+            try:
+                provenance_report = ScoreReport.from_dict(source_report)
+                if provenance_report.to_dict() != self.score.to_dict():
+                    errors.append(
+                        "scoring reduction artifact.provenance.source_report must match score"
+                    )
+            except HarnessIOError as exc:
+                errors.append(
+                    "scoring reduction artifact.provenance.source_report must parse as a ScoreReport: "
+                    + str(exc)
+                )
         if not _artifact_matches_score_source(self.artifact, self.score.source):
             errors.append(
                 "scoring reduction artifact path or uri must match score.source"
@@ -57,6 +82,29 @@ class ScoringYamlReduction:
                     errors.append("scoring reduction artifact.sha256 must match source file")
             except HarnessIOError as exc:
                 errors.append(str(exc))
+            else:
+                try:
+                    parsed_score = parse_scoring_yaml(local_path)
+                    source_aliases = tuple(
+                        source
+                        for source in (
+                            parsed_score.source,
+                            self.score.source,
+                            self.artifact.path,
+                            self.artifact.uri,
+                            str(local_path.resolve(strict=False)),
+                        )
+                        if source is not None
+                    )
+                    if not parsed_score.equivalent_to(
+                        self.score,
+                        source_aliases=source_aliases,
+                    ):
+                        errors.append(
+                            "scoring reduction score must match scoring_yaml source artifact bytes"
+                        )
+                except HarnessIOError as exc:
+                    errors.append(f"scoring reduction artifact scoring.yaml must parse: {exc}")
 
         if errors:
             raise HarnessIOError("; ".join(errors))
@@ -77,24 +125,61 @@ def reduce_scoring_yaml(
         uri=uri,
         field_name="scoring reduction artifact",
     )
+    score = parse_scoring_yaml_bytes(
+        scoring_bytes,
+        source=artifact_path,
+        parsed_at_utc=parsed_at_utc,
+    )
+    artifact_provenance = _scoring_report_provenance(provenance, score)
     try:
         artifact = ArtifactRef(
             kind="scoring_yaml",
             path=artifact_path,
             uri=uri,
             sha256=hashlib.sha256(scoring_bytes).hexdigest(),
-            provenance={} if provenance is None else provenance,
+            provenance=artifact_provenance,
         )
     except SchemaValidationError as exc:
         raise HarnessIOError(str(exc)) from exc
     return ScoringYamlReduction(
         artifact=artifact,
-        score=parse_scoring_yaml_bytes(
-            scoring_bytes,
-            source=artifact_path,
-            parsed_at_utc=parsed_at_utc,
-        ),
+        score=score,
     )
+
+
+def _report_sha256(mapping: Mapping[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _scoring_report_provenance(
+    provenance: Mapping[str, Any] | None,
+    score: ScoreReport,
+) -> dict[str, Any]:
+    merged = {} if provenance is None else dict(provenance)
+    score_payload = score.to_dict()
+    expected_report_sha256 = _report_sha256(score_payload)
+    existing_report_sha256 = merged.get("report_sha256")
+    if existing_report_sha256 is not None and existing_report_sha256 != expected_report_sha256:
+        raise HarnessIOError("scoring reduction provenance.report_sha256 must match reducer score")
+    existing_source_report = merged.get("source_report")
+    if existing_source_report is not None:
+        if not isinstance(existing_source_report, Mapping):
+            raise HarnessIOError("scoring reduction provenance.source_report must be a mapping")
+        try:
+            provenance_report = ScoreReport.from_dict(existing_source_report)
+        except HarnessIOError as exc:
+            raise HarnessIOError(
+                "scoring reduction provenance.source_report must parse as a ScoreReport: "
+                + str(exc)
+            ) from exc
+        if provenance_report.to_dict() != score_payload:
+            raise HarnessIOError("scoring reduction provenance.source_report must match reducer score")
+    merged["report_sha256"] = expected_report_sha256
+    merged["source_report"] = score_payload
+    return merged
 
 
 def attach_scoring_yaml_reduction(

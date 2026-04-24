@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import pytest
 
 from aic_signal_harness import (
@@ -20,6 +23,13 @@ from aic_signal_harness import (
     TrialScore,
     build_ledger_entry,
 )
+
+
+def _report_sha256(mapping: dict[str, object]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _live_backend(**overrides):
@@ -78,7 +88,10 @@ def _dataset_reduction() -> Hdf5DatasetReduction:
             kind="hdf5_dataset",
             path=report.source,
             sha256=report.sha256,
-            provenance={"declared_uri": "gs://bucket/data/demo.h5"},
+            provenance={
+                "declared_uri": "gs://bucket/data/demo.h5",
+                "report_sha256": _report_sha256(report.to_dict()),
+            },
         ),
         report=report,
     )

@@ -1,5 +1,8 @@
+import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -14,6 +17,13 @@ from aic_signal_harness import (
 )
 from aic_signal_harness.reducers.mcap_eval import _bundle_sha256_from_report
 import aic_signal_harness.reducers.mcap_eval as mcap_eval_reducer
+
+
+def _report_sha256(mapping: dict[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _stamp(sec: int, nanosec: int = 0) -> SimpleNamespace:
@@ -335,10 +345,11 @@ def test_reduce_mcap_eval_bundle_binds_artifact_identity_and_provenance(tmp_path
     assert reduction.artifact.kind == "mcap_eval_bundle"
     assert reduction.artifact.path == str(eval_dir.resolve())
     assert reduction.artifact.uri is None
-    assert reduction.artifact.provenance == {
-        "producer": "pytest",
-        "declared_uri": "gs://bucket/eval",
-    }
+    assert reduction.artifact.provenance["producer"] == "pytest"
+    assert reduction.artifact.provenance["declared_uri"] == "gs://bucket/eval"
+    assert isinstance(reduction.artifact.provenance["report_sha256"], str)
+    assert len(reduction.artifact.provenance["report_sha256"]) == 64
+    assert reduction.artifact.sha256 is not None
     assert len(reduction.artifact.sha256) == 64
 
 
@@ -355,6 +366,22 @@ def test_reduce_mcap_eval_bundle_rejects_conflicting_declared_uri_provenance(tmp
             analyzed_at_utc="2026-04-23T12:00:00Z",
             uri="gs://bucket/eval",
             provenance={"declared_uri": "gs://bucket/other"},
+            read_ros2_messages=_fake_reader({}),
+        )
+
+
+def test_reduce_mcap_eval_bundle_rejects_conflicting_report_sha256_provenance(tmp_path: Path) -> None:
+    eval_dir = tmp_path / "eval"
+    _bag_paths(eval_dir)
+
+    with pytest.raises(
+        HarnessIOError,
+        match="provenance.report_sha256 must match reducer report",
+    ):
+        reduce_mcap_eval_bundle(
+            eval_dir,
+            analyzed_at_utc="2026-04-23T12:00:00Z",
+            provenance={"report_sha256": "0" * 64},
             read_ros2_messages=_fake_reader({}),
         )
 
@@ -385,12 +412,24 @@ def test_mcap_eval_reduction_accepts_uri_bundle_identity() -> None:
             kind="mcap_eval_bundle",
             uri=report.source,
             sha256=_bundle_sha256_from_report(report),
+            provenance={"report_sha256": _report_sha256(report.to_dict())},
         ),
         report=report,
     )
 
     assert reduction.artifact.uri == report.source
     assert reduction.artifact.path is None
+
+    with pytest.raises(HarnessIOError, match="provenance.report_sha256"):
+        McapEvalReduction(
+            artifact=ArtifactRef(
+                kind="mcap_eval_bundle",
+                uri=report.source,
+                sha256=_bundle_sha256_from_report(report),
+                provenance={"report_sha256": "0" * 64},
+            ),
+            report=report,
+        )
 
 
 def test_mcap_eval_reduction_rejects_conflicting_second_identity_for_local_source() -> None:

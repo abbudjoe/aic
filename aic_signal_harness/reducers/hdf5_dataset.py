@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
 from pathlib import Path
 import os
 from typing import Any, Mapping
@@ -41,6 +43,10 @@ class Hdf5DatasetReduction:
         errors.extend(_identity_contract_errors(self.artifact, self.report.source))
         if self.artifact.sha256 != self.report.sha256:
             errors.append("hdf5 reduction artifact.sha256 must match report.sha256")
+        expected_report_sha256 = _report_sha256(self.report.to_dict())
+        report_sha256 = self.artifact.provenance.get("report_sha256")
+        if report_sha256 != expected_report_sha256:
+            errors.append("hdf5 reduction artifact.provenance.report_sha256 must match report")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -103,7 +109,10 @@ def reduce_hdf5_dataset(
         min_steps=min_steps,
         validated_at_utc=validated_at_utc,
     )
-    artifact_provenance = _with_declared_uri_provenance(provenance, uri)
+    artifact_provenance = _with_report_sha256_provenance(
+        _with_declared_uri_provenance(provenance, uri),
+        report,
+    )
     return Hdf5DatasetReduction(
         artifact=ArtifactRef(
             kind="hdf5_dataset",
@@ -299,7 +308,7 @@ def _identity_contract_errors(artifact: ArtifactRef, source: str) -> list[str]:
 def _with_declared_uri_provenance(
     provenance: Mapping[str, Any] | None,
     uri: str | None,
-) -> Mapping[str, Any]:
+) -> dict[str, Any]:
     merged = {} if provenance is None else dict(provenance)
     if uri is None:
         return merged
@@ -308,6 +317,26 @@ def _with_declared_uri_provenance(
         raise HarnessIOError("hdf5 reduction provenance.declared_uri must match reducer uri")
     merged["declared_uri"] = uri
     return merged
+
+
+def _with_report_sha256_provenance(
+    provenance: Mapping[str, Any],
+    report: Hdf5DatasetReport,
+) -> dict[str, Any]:
+    merged = dict(provenance)
+    report_sha256 = _report_sha256(report.to_dict())
+    existing = merged.get("report_sha256")
+    if existing is not None and existing != report_sha256:
+        raise HarnessIOError("hdf5 reduction provenance.report_sha256 must match reducer report")
+    merged["report_sha256"] = report_sha256
+    return merged
+
+
+def _report_sha256(mapping: Mapping[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _looks_like_dataset(value: Any) -> bool:

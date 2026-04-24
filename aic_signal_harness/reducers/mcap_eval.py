@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,10 @@ class McapEvalReduction:
         expected_sha256 = _bundle_sha256_from_report(self.report)
         if self.artifact.sha256 != expected_sha256:
             errors.append("mcap reduction artifact.sha256 must match report-derived bundle sha256")
+        expected_report_sha256 = _report_sha256(self.report.to_dict())
+        report_sha256 = self.artifact.provenance.get("report_sha256")
+        if report_sha256 != expected_report_sha256:
+            errors.append("mcap reduction artifact.provenance.report_sha256 must match report")
         if errors:
             raise HarnessIOError("; ".join(errors))
 
@@ -120,12 +125,16 @@ def reduce_mcap_eval_bundle(
         analyzed_at_utc=analyzed_at_utc,
         read_ros2_messages=read_ros2_messages,
     )
+    artifact_provenance = _with_report_sha256_provenance(
+        _with_declared_uri_provenance(provenance, uri),
+        report,
+    )
     return McapEvalReduction(
         artifact=ArtifactRef(
             kind="mcap_eval_bundle",
             path=report.source,
             sha256=_bundle_sha256_from_report(report),
-            provenance=_with_declared_uri_provenance(provenance, uri),
+            provenance=artifact_provenance,
         ),
         report=report,
     )
@@ -325,14 +334,15 @@ def _first_contact_evidence(
     nearest_command_angular: tuple[float, float, float] | None = None
 
     if nearest_state is not None and controller_states:
-        nearest_controller_elapsed_sec = (
+        controller_elapsed_sec = (
             nearest_state["stamp_sec"] - controller_states[0]["stamp_sec"]
         )
+        nearest_controller_elapsed_sec = controller_elapsed_sec
         nearest_tcp_position = nearest_state["tcp_position"]
         nearest_tcp_error = nearest_state["tcp_error"]
         if _same(task_hints.port_type if task_hints is not None else None, "sc"):
             recommended_stop_sec = _floor_step(
-                max(stop_step_sec, nearest_controller_elapsed_sec - contact_margin_sec),
+                max(stop_step_sec, controller_elapsed_sec - contact_margin_sec),
                 stop_step_sec,
             )
 
@@ -649,6 +659,26 @@ def _with_declared_uri_provenance(
         raise HarnessIOError("mcap reduction provenance.declared_uri must match reducer uri")
     merged["declared_uri"] = uri
     return merged
+
+
+def _with_report_sha256_provenance(
+    provenance: Mapping[str, Any],
+    report: McapEvalBundleReport,
+) -> dict[str, Any]:
+    merged = dict(provenance)
+    report_sha256 = _report_sha256(report.to_dict())
+    existing = merged.get("report_sha256")
+    if existing is not None and existing != report_sha256:
+        raise HarnessIOError("mcap reduction provenance.report_sha256 must match reducer report")
+    merged["report_sha256"] = report_sha256
+    return merged
+
+
+def _report_sha256(mapping: Mapping[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _stat_snapshot(path: Path) -> os.stat_result:

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tempfile
 from pathlib import Path
 from typing import Any, cast
 
+import h5py
 import pytest
 
 from aic_signal_harness import (
@@ -15,9 +17,17 @@ from aic_signal_harness import (
     FailureReport,
     FailureSeverity,
     HarnessIOError,
+    Hdf5DatasetReport,
+    Hdf5DatasetStats,
+    Hdf5DatasetThresholds,
     LeakageClass,
+    McapEvalBundleReport,
+    McapEvalFirstContact,
+    McapEvalTaskHints,
+    McapEvalTrialReport,
     PolicyTraceEvent,
     PolicyTraceEventType,
+    REQUIRED_HDF5_DATASET_KEYS,
     RewardReport,
     RewardSignalKind,
     RewardTerm,
@@ -84,12 +94,423 @@ def _policy_events(run_id: str = "run-a", official_trial_id: str | None = "trial
     )
 
 
+def _three_trial_policy_events(run_id: str = "run-a") -> tuple[PolicyTraceEvent, ...]:
+    events: list[PolicyTraceEvent] = []
+    event_index = 0
+    for trial_index in (1, 2, 3):
+        policy_trial_id = f"task_{trial_index}__policy_call_0001"
+        official_trial_id = f"trial_{trial_index}"
+        trial_events = [
+            PolicyTraceEvent(
+                run_id=run_id,
+                trial_id=policy_trial_id,
+                event_index=event_index,
+                event_type=PolicyTraceEventType.task_started,
+                elapsed_sec=float(trial_index - 1),
+                emitted_at_utc=f"2026-04-24T00:00:0{event_index}Z",
+                source="pytest",
+                leakage_class=LeakageClass.legal_policy_input,
+                payload={"task_id": f"task_{trial_index}"},
+                official_trial_id=official_trial_id,
+            ),
+            PolicyTraceEvent(
+                run_id=run_id,
+                trial_id=policy_trial_id,
+                event_index=event_index + 1,
+                event_type=PolicyTraceEventType.observation,
+                elapsed_sec=float(trial_index - 1) + 0.1,
+                emitted_at_utc=f"2026-04-24T00:00:0{event_index + 1}Z",
+                source="pytest",
+                leakage_class=LeakageClass.legal_policy_input,
+                payload={"camera": "left_pixels", "state_shape": [32]},
+                official_trial_id=official_trial_id,
+            ),
+            PolicyTraceEvent(
+                run_id=run_id,
+                trial_id=policy_trial_id,
+                event_index=event_index + 2,
+                event_type=PolicyTraceEventType.action_published,
+                elapsed_sec=float(trial_index - 1) + 0.2,
+                emitted_at_utc=f"2026-04-24T00:00:0{event_index + 2}Z",
+                source="pytest",
+                leakage_class=LeakageClass.legal_policy_action_output,
+                payload={
+                    "linear": [0.01 * trial_index, 0.0, 0.0],
+                    "angular": [0.0, 0.0, 0.0],
+                },
+                official_trial_id=official_trial_id,
+            ),
+        ]
+        events.extend(trial_events)
+        event_index += len(trial_events)
+    return tuple(events)
+
+
+def _policy_events_with_duplicate_official_trial() -> tuple[PolicyTraceEvent, ...]:
+    events = []
+    for event in _three_trial_policy_events():
+        official_trial_id = "trial_1" if event.trial_id == "task_2__policy_call_0001" else event.official_trial_id
+        events.append(
+            PolicyTraceEvent(
+                run_id=event.run_id,
+                trial_id=event.trial_id,
+                event_index=event.event_index,
+                event_type=event.event_type,
+                elapsed_sec=event.elapsed_sec,
+                emitted_at_utc=event.emitted_at_utc,
+                source=event.source,
+                leakage_class=event.leakage_class,
+                payload=event.payload,
+                official_trial_id=official_trial_id,
+            )
+        )
+    return tuple(events)
+
+
+def _scoring_yaml_source(total: float, trials: dict[str, TrialScore]) -> str:
+    identity = json.dumps(
+        {"total": total, "trials": {key: value.to_dict() for key, value in trials.items()}},
+        allow_nan=False,
+        sort_keys=True,
+    )
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    scoring_root = Path(tempfile.gettempdir()) / "aic_signal_harness_episode_trace_scoring"
+    scoring_root.mkdir(parents=True, exist_ok=True)
+    scoring_path = scoring_root / f"scoring-{digest}.yaml"
+    lines = [f"total: {total}"]
+    for trial_id, trial_score in trials.items():
+        lines.extend(
+            [
+                f"{trial_id}:",
+                "  tier_1:",
+                f"    score: {trial_score.tier_1}",
+                "  tier_2:",
+                f"    score: {trial_score.tier_2}",
+                "  tier_3:",
+                f"    score: {trial_score.tier_3}",
+            ]
+        )
+    scoring_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return str(scoring_path.resolve())
+
+
 def _score_report() -> ScoreReport:
+    trials = {"trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0)}
     return ScoreReport(
-        source=_SCORE_SOURCE,
+        source=_scoring_yaml_source(7.5, trials),
         parsed_at_utc="2026-04-24T00:00:03Z",
         total=7.5,
-        trials={"trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0)},
+        trials=trials,
+    )
+
+
+def _three_trial_score_report() -> ScoreReport:
+    trials = {
+        "trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0),
+        "trial_2": TrialScore(total=2.5, tier_1=1.0, tier_2=1.5, tier_3=0.0),
+        "trial_3": TrialScore(total=2.0, tier_1=1.0, tier_2=1.0, tier_3=0.0),
+    }
+    return ScoreReport(
+        source=_scoring_yaml_source(12.0, trials),
+        parsed_at_utc="2026-04-24T00:00:09Z",
+        total=12.0,
+        trials=trials,
+    )
+
+
+def _mcap_bundle_report() -> McapEvalBundleReport:
+    bundle_root = Path(tempfile.gettempdir()) / "aic_signal_harness_episode_trace_mcap" / "run-a"
+    bundle_root.mkdir(parents=True, exist_ok=True)
+
+    def trial_file(trial_index: int) -> tuple[str, int, str]:
+        trial_dir = bundle_root / f"bag_trial_{trial_index}"
+        trial_dir.mkdir(parents=True, exist_ok=True)
+        trial_path = trial_dir / f"bag_trial_{trial_index}_0.mcap"
+        content = f"mcap-trial-{trial_index}\n".encode("utf-8")
+        trial_path.write_bytes(content)
+        return str(trial_path.resolve()), len(content), hashlib.sha256(content).hexdigest()
+
+    trial_1_source, trial_1_size, trial_1_sha256 = trial_file(1)
+    trial_2_source, trial_2_size, trial_2_sha256 = trial_file(2)
+    trial_3_source, trial_3_size, trial_3_sha256 = trial_file(3)
+    return McapEvalBundleReport(
+        source=str(bundle_root.resolve()),
+        analyzed_at_utc="2026-04-24T00:00:10Z",
+        contact_margin_sec=0.25,
+        stop_step_sec=0.05,
+        recommended_env={"AIC_LEWM_SC_REPLAY_STOP_SEC": "0.15"},
+        trials=(
+            McapEvalTrialReport(
+                trial_id="trial_1",
+                source=trial_1_source,
+                size_bytes=trial_1_size,
+                sha256=trial_1_sha256,
+                controller_state_count=2,
+                pose_command_count=1,
+                off_limit_contact_count=1,
+                controller_stamp_start_sec=10.0,
+                controller_stamp_end_sec=10.4,
+                controller_duration_sec=0.4,
+                final_tcp_position=(1.0, 2.0, 3.0),
+                final_tcp_error=(0.1, 0.2, 0.3),
+                task_hints=McapEvalTaskHints(port_type="sc", task_id="task_1"),
+                first_off_limit_contact=McapEvalFirstContact(
+                    log_time_ns=1_300_000_000,
+                    collision1="plug",
+                    collision2="enclosure",
+                    log_elapsed_sec=0.3,
+                    nearest_controller_elapsed_sec=0.4,
+                    nearest_command_elapsed_sec=0.15,
+                    nearest_tcp_position=(1.0, 2.0, 3.0),
+                    nearest_tcp_error=(0.1, 0.2, 0.3),
+                    nearest_command_linear=(0.01, 0.02, 0.03),
+                    nearest_command_angular=(0.04, 0.05, 0.06),
+                    recommended_stop_sec=0.15,
+                ),
+            ),
+            McapEvalTrialReport(
+                trial_id="trial_2",
+                source=trial_2_source,
+                size_bytes=trial_2_size,
+                sha256=trial_2_sha256,
+                controller_state_count=0,
+                pose_command_count=0,
+                off_limit_contact_count=0,
+            ),
+            McapEvalTrialReport(
+                trial_id="trial_3",
+                source=trial_3_source,
+                size_bytes=trial_3_size,
+                sha256=trial_3_sha256,
+                controller_state_count=0,
+                pose_command_count=0,
+                off_limit_contact_count=0,
+            ),
+        ),
+    )
+
+
+def _hdf5_dataset_report() -> Hdf5DatasetReport:
+    dataset_root = Path(tempfile.gettempdir()) / "aic_signal_harness_episode_trace_hdf5"
+    dataset_root.mkdir(parents=True, exist_ok=True)
+    dataset_path = dataset_root / "demo.hdf5"
+    _write_hdf5_dataset_fixture(dataset_path)
+    datasets = {
+        "ep_len": Hdf5DatasetStats(shape=(3,), dtype="int32"),
+        "ep_offset": Hdf5DatasetStats(shape=(3,), dtype="int64"),
+        "ep_idx": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "episode_idx": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "step_idx": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "pixels": Hdf5DatasetStats(shape=(6, 8, 8, 3), dtype="uint8"),
+        "left_pixels": Hdf5DatasetStats(shape=(6, 8, 8, 3), dtype="uint8"),
+        "right_pixels": Hdf5DatasetStats(shape=(6, 8, 8, 3), dtype="uint8"),
+        "proprio": Hdf5DatasetStats(shape=(6, 32), dtype="float32"),
+        "state": Hdf5DatasetStats(shape=(6, 32), dtype="float32"),
+        "action": Hdf5DatasetStats(shape=(6, 6), dtype="float32"),
+        "task_id": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "plug_type": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "port_type": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+        "target_module_name": Hdf5DatasetStats(shape=(6,), dtype="int32"),
+    }
+    return Hdf5DatasetReport(
+        source=str(dataset_path.resolve()),
+        size_bytes=dataset_path.stat().st_size,
+        sha256=sha256_file(dataset_path),
+        validated_at_utc="2026-04-24T00:00:11Z",
+        thresholds=Hdf5DatasetThresholds(min_episodes=3, min_steps=6),
+        required_datasets=REQUIRED_HDF5_DATASET_KEYS,
+        missing_datasets=(),
+        datasets=datasets,
+        episode_count=3,
+        step_count=6,
+        episode_lengths=(2, 2, 2),
+        episode_offsets=(0, 2, 4),
+        errors=(),
+        ok=True,
+    )
+
+
+def _write_hdf5_dataset_fixture(dataset_path: Path) -> None:
+    with h5py.File(dataset_path, "w") as handle:
+        handle.create_dataset("ep_len", data=[2, 2, 2], dtype="int32")
+        handle.create_dataset("ep_offset", data=[0, 2, 4], dtype="int64")
+        handle.create_dataset("ep_idx", data=[0, 0, 1, 1, 2, 2], dtype="int32")
+        handle.create_dataset("episode_idx", data=[0, 0, 1, 1, 2, 2], dtype="int32")
+        handle.create_dataset("step_idx", data=[0, 1, 0, 1, 0, 1], dtype="int32")
+        pixels = [[[[0, 0, 0] for _ in range(8)] for _ in range(8)] for _ in range(6)]
+        handle.create_dataset("pixels", data=pixels, dtype="uint8")
+        handle.create_dataset("left_pixels", data=pixels, dtype="uint8")
+        handle.create_dataset("right_pixels", data=pixels, dtype="uint8")
+        proprio = [[0.0 for _ in range(32)] for _ in range(6)]
+        handle.create_dataset("proprio", data=proprio, dtype="float32")
+        handle.create_dataset("state", data=proprio, dtype="float32")
+        action = [[0.0 for _ in range(6)] for _ in range(6)]
+        handle.create_dataset("action", data=action, dtype="float32")
+        task_ids = [0, 1, 2, 3, 4, 5]
+        handle.create_dataset("task_id", data=task_ids, dtype="int32")
+        handle.create_dataset("plug_type", data=task_ids, dtype="int32")
+        handle.create_dataset("port_type", data=task_ids, dtype="int32")
+        handle.create_dataset("target_module_name", data=task_ids, dtype="int32")
+
+
+def _uri_mcap_bundle_report() -> McapEvalBundleReport:
+    return McapEvalBundleReport(
+        source="gs://bucket/eval",
+        analyzed_at_utc="2026-04-24T00:00:10Z",
+        contact_margin_sec=0.25,
+        stop_step_sec=0.05,
+        recommended_env={},
+        trials=(
+            McapEvalTrialReport(
+                trial_id="trial_1",
+                source="gs://bucket/eval/bag_trial_1/bag_trial_1_0.mcap",
+                size_bytes=101,
+                sha256="1" * 64,
+                controller_state_count=0,
+                pose_command_count=0,
+                off_limit_contact_count=0,
+            ),
+            McapEvalTrialReport(
+                trial_id="trial_2",
+                source="gs://bucket/eval/bag_trial_2/bag_trial_2_0.mcap",
+                size_bytes=102,
+                sha256="2" * 64,
+                controller_state_count=0,
+                pose_command_count=0,
+                off_limit_contact_count=0,
+            ),
+            McapEvalTrialReport(
+                trial_id="trial_3",
+                source="gs://bucket/eval/bag_trial_3/bag_trial_3_0.mcap",
+                size_bytes=103,
+                sha256="3" * 64,
+                controller_state_count=0,
+                pose_command_count=0,
+                off_limit_contact_count=0,
+            ),
+        ),
+    )
+
+
+def _uri_hdf5_dataset_report() -> Hdf5DatasetReport:
+    local_report = _hdf5_dataset_report()
+    return Hdf5DatasetReport(
+        source="gs://bucket/data/demo.hdf5",
+        size_bytes=local_report.size_bytes,
+        sha256=local_report.sha256,
+        validated_at_utc=local_report.validated_at_utc,
+        thresholds=local_report.thresholds,
+        required_datasets=local_report.required_datasets,
+        missing_datasets=local_report.missing_datasets,
+        datasets=local_report.datasets,
+        episode_count=local_report.episode_count,
+        step_count=local_report.step_count,
+        episode_lengths=local_report.episode_lengths,
+        episode_offsets=local_report.episode_offsets,
+        errors=local_report.errors,
+        ok=local_report.ok,
+    )
+
+
+def _mcap_bundle_sha256(report: McapEvalBundleReport) -> str:
+    digest = hashlib.sha256()
+    bundle_root = None if "://" in report.source else Path(report.source)
+    for trial in report.trials:
+        trial_identity = (
+            trial.source
+            if bundle_root is None
+            else Path(trial.source).relative_to(bundle_root).as_posix()
+        )
+        digest.update(trial.trial_id.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(trial_identity.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(trial.size_bytes).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(trial.sha256.encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _report_sha256(mapping: dict[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _event_projection_sha256(events: list[dict[str, Any]]) -> str:
+    payload = (
+        json.dumps(events, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _mcap_artifact(
+    report: McapEvalBundleReport,
+    *,
+    sha256: str | None = None,
+    report_sha256: str | None = None,
+    source_report: dict[str, Any] | None = None,
+) -> ArtifactRef:
+    provenance: dict[str, Any] = {
+        "producer": "pytest",
+        "run_id": "run-a",
+        "report_sha256": (
+            _report_sha256(report.to_dict())
+            if report_sha256 is None
+            else report_sha256
+        ),
+    }
+    if source_report is not None:
+        provenance["source_report"] = source_report
+    source_key = "uri" if "://" in report.source else "path"
+    return ArtifactRef(
+        kind="mcap_eval_bundle",
+        **{source_key: report.source},
+        sha256=_mcap_bundle_sha256(report) if sha256 is None else sha256,
+        provenance=provenance,
+    )
+
+
+def _hdf5_artifact(
+    report: Hdf5DatasetReport,
+    *,
+    sha256: str | None = None,
+    report_sha256: str | None = None,
+    source_report: dict[str, Any] | None = None,
+) -> ArtifactRef:
+    provenance: dict[str, Any] = {
+        "producer": "pytest",
+        "run_id": "run-a",
+        "report_sha256": (
+            _report_sha256(report.to_dict())
+            if report_sha256 is None
+            else report_sha256
+        ),
+    }
+    if source_report is not None:
+        provenance["source_report"] = source_report
+    source_key = "uri" if "://" in report.source else "path"
+    return ArtifactRef(
+        kind="hdf5_dataset",
+        **{source_key: report.source},
+        sha256=report.sha256 if sha256 is None else sha256,
+        provenance=provenance,
+    )
+
+
+def _typed_report_artifact(kind: str, report: Any) -> ArtifactRef:
+    report_payload = report.to_dict()
+    report_digest = _report_sha256(report_payload)
+    report_root = Path(tempfile.gettempdir()) / "aic_signal_harness_episode_trace_reports"
+    report_path = report_root / f"{kind}-{report_digest}.json"
+    write_json(report_path, report_payload, overwrite=True)
+    return ArtifactRef(
+        kind=kind,
+        path=str(report_path),
+        sha256=sha256_file(report_path),
+        provenance={"producer": "pytest", "run_id": "run-a"},
     )
 
 
@@ -135,7 +556,12 @@ def _failure_report() -> FailureReport:
     )
 
 
-def _source_artifacts(*, include_reports: bool = False) -> tuple[ArtifactRef, ...]:
+def _source_artifacts(
+    *,
+    include_reports: bool = False,
+    score_report: ScoreReport | None = None,
+) -> tuple[ArtifactRef, ...]:
+    typed_score_report = _score_report() if score_report is None else score_report
     policy_artifact = ArtifactRef(
         kind="policy_trace_jsonl",
         uri="memory://pytest/policy_trace.jsonl",
@@ -144,9 +570,14 @@ def _source_artifacts(*, include_reports: bool = False) -> tuple[ArtifactRef, ..
     )
     scoring_artifact = ArtifactRef(
         kind="scoring_yaml",
-        uri=_SCORE_SOURCE,
-        sha256="c" * 64,
-        provenance={"producer": "pytest", "run_id": "run-a"},
+        path=typed_score_report.source,
+        sha256=sha256_file(typed_score_report.source),
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "report_sha256": _report_sha256(typed_score_report.to_dict()),
+            "source_report": typed_score_report.to_dict(),
+        },
     )
     artifacts: tuple[ArtifactRef, ...] = (scoring_artifact, policy_artifact)
     if include_reports:
@@ -193,6 +624,23 @@ def _episode_trace() -> EpisodeTrace:
     )
 
 
+def _hdf5_episode_trace() -> EpisodeTrace:
+    hdf5_report = _hdf5_dataset_report()
+    score_report = _three_trial_score_report()
+    return derive_episode_trace(
+        run_id="run-a",
+        policy_events=_three_trial_policy_events(),
+        source_artifacts=(
+            *_source_artifacts(score_report=score_report),
+            _hdf5_artifact(hdf5_report),
+            _typed_report_artifact("hdf5_dataset_report", hdf5_report),
+        ),
+        score_report=score_report,
+        hdf5_dataset_report=hdf5_report,
+        generated_at_utc="2026-04-24T00:00:11Z",
+    )
+
+
 def _episode_trace_sha256(trace: EpisodeTrace) -> str:
     payload = (
         json.dumps(trace.to_dict(), allow_nan=False, indent=2, sort_keys=True) + "\n"
@@ -215,6 +663,16 @@ def _source_trace_ref(
             "derivation": "derive_episode_trace",
         },
     )
+
+
+def _reindex_episode_payload(payload: dict[str, Any]) -> None:
+    ordered_events = [
+        event
+        for trial in payload["trials"]
+        for event in trial["events"]
+    ] + payload["run_events"]
+    for index, event in enumerate(ordered_events):
+        event["event_index"] = index
 
 
 def test_episode_trace_round_trip_and_training_signals() -> None:
@@ -273,6 +731,33 @@ def test_episode_trace_round_trip_and_training_signals() -> None:
     assert all(event.payload["evidence_window"]["end_elapsed_sec"] == 0.5 for event in trial_scoped)
 
 
+def test_episode_trace_fuses_hdf5_and_observation_evidence() -> None:
+    trace = _hdf5_episode_trace()
+
+    assert EpisodeTrace.from_dict(trace.to_dict()) == trace
+    assert trace.generated_at_utc == "2026-04-24T00:00:11Z"
+    assert trace.trials[0].observation_event_count == 1
+    assert trace.trials[0].events[1].event_kind is TimelineEventKind.observation_event
+    assert trace.trials[0].score is not None
+    assert trace.trials[0].score.total == 7.5
+
+    event_kinds = [event.event_kind for event in trace.run_events]
+    assert event_kinds.count(TimelineEventKind.dataset_episode_summary) == 1
+    assert event_kinds.count(TimelineEventKind.official_score) == 1
+
+    dataset_event = next(
+        event
+        for event in trace.run_events
+        if event.event_kind is TimelineEventKind.dataset_episode_summary
+    )
+    assert dataset_event.leakage_class is LeakageClass.privileged_training_signal
+    dataset_payload = dataset_event.to_dict()["payload"]
+    assert dataset_payload["episode_count"] == 3
+    assert dataset_payload["step_count"] == 6
+    assert dataset_payload["observation_datasets"]["pixels"]["shape"] == [6, 8, 8, 3]
+    assert dataset_payload["action_datasets"]["action"]["shape"] == [6, 6]
+
+
 def test_training_signal_report_defaults_to_episode_trace_timestamp() -> None:
     trace = _episode_trace()
 
@@ -306,15 +791,8 @@ def test_episode_trace_defaults_to_latest_source_evidence_timestamp() -> None:
     assert first_trace == second_trace
     assert first_trace.generated_at_utc == "2026-04-24T00:00:03Z"
 
-    fused_trace = derive_episode_trace(
-        run_id="run-a",
-        policy_events=_policy_events(),
-        source_artifacts=_source_artifacts(include_reports=True),
-        score_report=_score_report(),
-        reward_report=_reward_report(),
-        failure_report=_failure_report(),
-    )
-    assert fused_trace.generated_at_utc == "2026-04-24T00:00:04Z"
+    hdf5_trace = _hdf5_episode_trace()
+    assert hdf5_trace.generated_at_utc == "2026-04-24T00:00:11Z"
 
 
 def test_episode_trace_rejects_policy_run_id_mismatch() -> None:
@@ -378,20 +856,21 @@ def test_episode_trace_rejects_ambiguous_or_mismatched_score_trial_mapping() -> 
             generated_at_utc="2026-04-24T00:00:05Z",
         )
 
+    two_trial_score_trials = {
+        "trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0),
+        "trial_2": TrialScore(total=0.5, tier_1=0.5, tier_2=0.0, tier_3=0.0),
+    }
     two_trial_score = ScoreReport(
-        source=_SCORE_SOURCE,
+        source=_scoring_yaml_source(8.0, two_trial_score_trials),
         parsed_at_utc="2026-04-24T00:00:03Z",
         total=8.0,
-        trials={
-            "trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0),
-            "trial_2": TrialScore(total=0.5, tier_1=0.5, tier_2=0.0, tier_3=0.0),
-        },
+        trials=two_trial_score_trials,
     )
     with pytest.raises(HarnessIOError, match="unmatched official scores"):
         derive_episode_trace(
             run_id="run-a",
             policy_events=_policy_events(),
-            source_artifacts=_source_artifacts(),
+            source_artifacts=_source_artifacts(score_report=two_trial_score),
             score_report=two_trial_score,
             generated_at_utc="2026-04-24T00:00:05Z",
         )
@@ -406,6 +885,232 @@ def test_episode_trace_rejects_scored_policy_events_without_official_trial_id() 
             score_report=_score_report(),
             generated_at_utc="2026-04-24T00:00:05Z",
         )
+
+
+def test_episode_trace_rejects_unbound_mcap_and_hdf5_evidence() -> None:
+    mcap_report = _mcap_bundle_report()
+    hdf5_report = _hdf5_dataset_report()
+    score_report = _three_trial_score_report()
+
+    forged_hdf5_payload = hdf5_report.to_dict()
+    forged_hdf5_payload["datasets"]["pixels"]["shape"] = [6, 99, 8, 3]
+    forged_hdf5_report = Hdf5DatasetReport.from_dict(forged_hdf5_payload)
+    with pytest.raises(HarnessIOError, match="must match supplied hdf5_dataset_report bytes"):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_three_trial_policy_events(),
+            source_artifacts=(
+                *_source_artifacts(score_report=score_report),
+                _hdf5_artifact(forged_hdf5_report),
+                _typed_report_artifact("hdf5_dataset_report", forged_hdf5_report),
+            ),
+            score_report=score_report,
+            hdf5_dataset_report=forged_hdf5_report,
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+    with pytest.raises(
+        HarnessIOError,
+        match="MCAP evidence requires the dedicated byte rederive slice/analyzer injection",
+        ):
+            derive_episode_trace(
+                run_id="run-a",
+                policy_events=_three_trial_policy_events(),
+                source_artifacts=_source_artifacts(score_report=score_report),
+                score_report=score_report,
+                mcap_eval_bundle=mcap_report,
+                generated_at_utc="2026-04-24T00:00:05Z",
+            )
+
+
+def test_episode_trace_allows_fused_hdf5_with_attached_report_artifact() -> None:
+    hdf5_report = _hdf5_dataset_report()
+
+    trace = derive_episode_trace(
+        run_id="run-a",
+        policy_events=_policy_events(),
+        source_artifacts=(
+            *_source_artifacts(),
+            _hdf5_artifact(hdf5_report),
+            _typed_report_artifact("hdf5_dataset_report", hdf5_report),
+        ),
+        hdf5_dataset_report=hdf5_report,
+        generated_at_utc="2026-04-24T00:00:05Z",
+    )
+
+    assert EpisodeTrace.from_dict(trace.to_dict()) == trace
+    assert any(
+        artifact.kind == "hdf5_dataset_report"
+        for artifact in trace.source_artifacts
+    )
+
+
+def test_episode_trace_allows_quiet_uri_only_mcap_and_hdf5_artifacts() -> None:
+    mcap_report = _uri_mcap_bundle_report()
+    hdf5_report = _uri_hdf5_dataset_report()
+
+    trace = derive_episode_trace(
+        run_id="run-a",
+        policy_events=_policy_events(),
+        source_artifacts=(
+            *_source_artifacts(),
+            _mcap_artifact(mcap_report),
+            _hdf5_artifact(hdf5_report),
+        ),
+        generated_at_utc="2026-04-24T00:00:05Z",
+    )
+
+    assert EpisodeTrace.from_dict(trace.to_dict()) == trace
+    assert trace.run_events == ()
+    assert {artifact.kind for artifact in trace.source_artifacts} == {
+        "scoring_yaml",
+        "policy_trace_jsonl",
+        "mcap_eval_bundle",
+        "hdf5_dataset",
+    }
+    quiet_mcap = next(artifact for artifact in trace.source_artifacts if artifact.kind == "mcap_eval_bundle")
+    quiet_hdf5 = next(artifact for artifact in trace.source_artifacts if artifact.kind == "hdf5_dataset")
+    assert quiet_mcap.path is None and quiet_mcap.uri == mcap_report.source
+    assert quiet_hdf5.path is None and quiet_hdf5.uri == hdf5_report.source
+
+    with pytest.raises(
+        HarnessIOError,
+        match="MCAP evidence requires the dedicated byte rederive slice/analyzer injection",
+    ):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(*_source_artifacts(), _mcap_artifact(mcap_report)),
+            mcap_eval_bundle=mcap_report,
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+    with pytest.raises(
+        HarnessIOError,
+        match="hdf5_dataset source artifact must be a local byte-verifiable file",
+    ):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(
+                *_source_artifacts(),
+                _hdf5_artifact(hdf5_report),
+                _typed_report_artifact("hdf5_dataset_report", hdf5_report),
+            ),
+            hdf5_dataset_report=hdf5_report,
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+
+def test_episode_trace_rejects_malformed_post_hoc_evidence_events() -> None:
+    hdf5_report = _hdf5_dataset_report()
+    trace = _hdf5_episode_trace()
+    payload = trace.to_dict()
+
+    missing_payload = dict(payload)
+    missing_payload["run_events"] = [dict(event) for event in payload["run_events"]]
+    missing_payload["run_events"][0] = {
+        **missing_payload["run_events"][0],
+        "payload": {},
+    }
+    with pytest.raises(HarnessIOError, match="source_report_sha256"):
+        EpisodeTrace.from_dict(missing_payload)
+
+    bad_leakage = dict(payload)
+    bad_leakage["run_events"] = [dict(event) for event in payload["run_events"]]
+    bad_leakage["run_events"][0] = {
+        **bad_leakage["run_events"][0],
+        "leakage_class": LeakageClass.legal_policy_input.value,
+    }
+    with pytest.raises(HarnessIOError, match="privileged_training_signal"):
+        EpisodeTrace.from_dict(bad_leakage)
+
+    extra_dataset_payload = dict(payload)
+    extra_dataset_payload["run_events"] = [dict(event) for event in payload["run_events"]]
+    extra_dataset_payload["run_events"][0] = {
+        **extra_dataset_payload["run_events"][0],
+        "payload": {
+            **extra_dataset_payload["run_events"][0]["payload"],
+            "extra_label": "must not be accepted",
+        },
+    }
+    extra_dataset_events = [
+        event
+        for event in extra_dataset_payload["run_events"]
+        if event["event_kind"] == TimelineEventKind.dataset_episode_summary.value
+    ]
+    extra_dataset_payload["source_artifacts"] = [dict(artifact) for artifact in payload["source_artifacts"]]
+    for artifact in extra_dataset_payload["source_artifacts"]:
+        if artifact["kind"] == "hdf5_dataset":
+            artifact["provenance"] = {
+                **artifact["provenance"],
+                "source_report_event_projection_sha256": _event_projection_sha256(extra_dataset_events),
+                "canonical_event_projection_sha256": _event_projection_sha256(extra_dataset_events),
+            }
+    with pytest.raises(HarnessIOError, match="payload must exactly match source_report"):
+        EpisodeTrace.from_dict(extra_dataset_payload)
+
+    bad_dataset_report_sha = dict(payload)
+    bad_dataset_report_sha["source_artifacts"] = [dict(artifact) for artifact in payload["source_artifacts"]]
+    for artifact in bad_dataset_report_sha["source_artifacts"]:
+        if artifact["kind"] == "hdf5_dataset":
+            artifact["provenance"] = {
+                **artifact["provenance"],
+                "report_sha256": "0" * 64,
+            }
+    with pytest.raises(HarnessIOError, match="provenance.report_sha256"):
+        EpisodeTrace.from_dict(bad_dataset_report_sha)
+
+    forged_hdf5_payload = hdf5_report.to_dict()
+    forged_hdf5_payload["datasets"]["pixels"]["shape"] = [6, 99, 8, 3]
+    forged_hdf5_report = Hdf5DatasetReport.from_dict(forged_hdf5_payload)
+    forged_dataset_payload = dict(payload)
+    forged_dataset_payload["run_events"] = [dict(event) for event in payload["run_events"]]
+    forged_dataset_payload["run_events"][0] = {
+        **forged_dataset_payload["run_events"][0],
+        "payload": {
+            **forged_dataset_payload["run_events"][0]["payload"],
+            "source_report_sha256": _report_sha256(forged_hdf5_report.to_dict()),
+            "observation_datasets": {
+                **forged_dataset_payload["run_events"][0]["payload"]["observation_datasets"],
+                "pixels": {
+                    **forged_dataset_payload["run_events"][0]["payload"]["observation_datasets"]["pixels"],
+                    "shape": [6, 99, 8, 3],
+                },
+            },
+        },
+    }
+    forged_dataset_events = [
+        event
+        for event in forged_dataset_payload["run_events"]
+        if event["event_kind"] == TimelineEventKind.dataset_episode_summary.value
+    ]
+    forged_dataset_payload["source_artifacts"] = [dict(artifact) for artifact in payload["source_artifacts"]]
+    for artifact in forged_dataset_payload["source_artifacts"]:
+        if artifact["kind"] == "hdf5_dataset":
+            artifact["provenance"] = {
+                **artifact["provenance"],
+                "report_sha256": _report_sha256(forged_hdf5_report.to_dict()),
+                "source_report_event_projection_sha256": _event_projection_sha256(forged_dataset_events),
+                "canonical_event_projection_sha256": _event_projection_sha256(forged_dataset_events),
+            }
+        elif artifact["kind"] == "hdf5_dataset_report":
+            artifact.update(_typed_report_artifact("hdf5_dataset_report", forged_hdf5_report).to_dict())
+    with pytest.raises(HarnessIOError, match="must match supplied hdf5_dataset_report bytes"):
+        EpisodeTrace.from_dict(forged_dataset_payload)
+
+    for event_kind in (TimelineEventKind.controller_summary.value, TimelineEventKind.contact_evidence.value):
+        bad_mcap_payload = dict(payload)
+        bad_mcap_payload["run_events"] = [dict(event) for event in payload["run_events"]]
+        bad_mcap_payload["run_events"][0] = {
+            **bad_mcap_payload["run_events"][0],
+            "event_kind": event_kind,
+        }
+        with pytest.raises(
+            HarnessIOError,
+            match="MCAP evidence requires the dedicated byte rederive slice/analyzer injection",
+        ):
+            EpisodeTrace.from_dict(bad_mcap_payload)
 
 
 def test_episode_trace_revalidates_direct_policy_event_sequences() -> None:
@@ -642,8 +1347,86 @@ def test_episode_trace_rejects_foreign_or_unbound_source_artifacts(tmp_path: Pat
             generated_at_utc="2026-04-24T00:00:05Z",
         )
 
+    unbound_uri_scoring = ArtifactRef(
+        kind="scoring_yaml",
+        uri=_SCORE_SOURCE,
+        sha256="c" * 64,
+        provenance={"producer": "pytest", "run_id": "run-a"},
+    )
+    with pytest.raises(HarnessIOError, match="local scoring.yaml snapshot"):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(unbound_uri_scoring, policy_artifact),
+            score_report=ScoreReport(
+                source=_SCORE_SOURCE,
+                parsed_at_utc="2026-04-24T00:00:03Z",
+                total=999.0,
+                trials={
+                    "trial_1": TrialScore(total=999.0, tier_1=1.0, tier_2=2.5, tier_3=995.5)
+                },
+            ),
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+    forged_score_report = ScoreReport(
+        source=_SCORE_SOURCE,
+        parsed_at_utc="2026-04-24T00:00:03Z",
+        total=999.0,
+        trials={
+            "trial_1": TrialScore(total=999.0, tier_1=1.0, tier_2=2.5, tier_3=995.5)
+        },
+    )
+    caller_bound_uri_scoring = ArtifactRef(
+        kind="scoring_yaml",
+        uri=_SCORE_SOURCE,
+        sha256="0" * 64,
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "report_sha256": _report_sha256(forged_score_report.to_dict()),
+        },
+    )
+    with pytest.raises(HarnessIOError, match="local scoring.yaml snapshot"):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(caller_bound_uri_scoring, policy_artifact),
+            score_report=forged_score_report,
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+    scoreless_trace = _episode_trace().to_dict()
+    scoreless_trace["run_events"] = [
+        event
+        for event in scoreless_trace["run_events"]
+        if event["event_kind"] != TimelineEventKind.official_score.value
+    ]
+    _reindex_episode_payload(scoreless_trace)
+    for artifact in scoreless_trace["source_artifacts"]:
+        if artifact["kind"] == "scoring_yaml":
+            artifact["provenance"] = {
+                **artifact["provenance"],
+                "report_sha256": _report_sha256(forged_score_report.to_dict()),
+                "source_report": forged_score_report.to_dict(),
+            }
+    with pytest.raises(HarnessIOError, match="source_report must match parsed scoring.yaml"):
+        EpisodeTrace.from_dict(scoreless_trace)
+
     scoring_path = tmp_path / "scoring.yaml"
-    scoring_path.write_text("total: 7.5\n", encoding="utf-8")
+    scoring_path.write_text(
+        """
+total: 7.5
+trial_1:
+  tier_1:
+    score: 1.0
+  tier_2:
+    score: 2.5
+  tier_3:
+    score: 4.0
+""",
+        encoding="utf-8",
+    )
     wrong_digest_scoring = ArtifactRef(
         kind="scoring_yaml",
         path=str(scoring_path),
@@ -661,6 +1444,42 @@ def test_episode_trace_rejects_foreign_or_unbound_source_artifacts(tmp_path: Pat
                 total=7.5,
                 trials={
                     "trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0)
+                },
+            ),
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
+
+    bound_scoring_path = tmp_path / "bound_scoring.yaml"
+    bound_scoring_path.write_text(
+        """
+total: 7.5
+trial_1:
+  tier_1:
+    score: 1.0
+  tier_2:
+    score: 2.5
+  tier_3:
+    score: 4.0
+""",
+        encoding="utf-8",
+    )
+    bound_scoring = ArtifactRef(
+        kind="scoring_yaml",
+        path=str(bound_scoring_path),
+        sha256=sha256_file(bound_scoring_path),
+        provenance={"producer": "pytest", "run_id": "run-a"},
+    )
+    with pytest.raises(HarnessIOError, match="score_report must match scoring_yaml"):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(bound_scoring, policy_artifact),
+            score_report=ScoreReport(
+                source=str(bound_scoring_path.resolve()),
+                parsed_at_utc="2026-04-24T00:00:03Z",
+                total=999.0,
+                trials={
+                    "trial_1": TrialScore(total=999.0, tier_1=1.0, tier_2=2.5, tier_3=995.5)
                 },
             ),
             generated_at_utc="2026-04-24T00:00:05Z",
@@ -687,6 +1506,40 @@ def test_episode_trace_rejects_foreign_or_unbound_source_artifacts(tmp_path: Pat
         generated_at_utc="2026-04-24T00:00:05Z",
     )
     assert localhost_trace.trials[0].score is not None
+
+    conflicting_source_report = ScoreReport(
+        source=str(scoring_path.resolve()),
+        parsed_at_utc="2026-04-24T00:00:03Z",
+        total=999.0,
+        trials={
+            "trial_1": TrialScore(total=999.0, tier_1=1.0, tier_2=2.5, tier_3=995.5)
+        },
+    )
+    conflicting_source_report_scoring = ArtifactRef(
+        kind="scoring_yaml",
+        path=str(scoring_path),
+        sha256=sha256_file(scoring_path),
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "source_report": conflicting_source_report.to_dict(),
+        },
+    )
+    with pytest.raises(HarnessIOError, match="provenance.source_report"):
+        derive_episode_trace(
+            run_id="run-a",
+            policy_events=_policy_events(),
+            source_artifacts=(conflicting_source_report_scoring, policy_artifact),
+            score_report=ScoreReport(
+                source=str(scoring_path.resolve()),
+                parsed_at_utc="2026-04-24T00:00:03Z",
+                total=7.5,
+                trials={
+                    "trial_1": TrialScore(total=7.5, tier_1=1.0, tier_2=2.5, tier_3=4.0)
+                },
+            ),
+            generated_at_utc="2026-04-24T00:00:05Z",
+        )
 
     missing_scoring_without_report = ArtifactRef(
         kind="scoring_yaml",
@@ -773,13 +1626,11 @@ def test_episode_trace_rejects_inconsistent_summaries_and_indices() -> None:
             events=trial.events,
         )
 
-    bad_run_event = TimelineEvent(
-        event_index=99,
-        event_kind=TimelineEventKind.official_score,
-        elapsed_sec=0.5,
-        source="/tmp/scoring.yaml",
-        leakage_class=LeakageClass.privileged_eval_signal,
-        payload={"event_scope": "post_hoc_run_summary", "evidence_window": {"start_elapsed_sec": 0.0, "end_elapsed_sec": 0.5}},
+    bad_run_event = TimelineEvent.from_dict(
+        {
+            **trace.run_events[0].to_dict(),
+            "event_index": 99,
+        }
     )
     with pytest.raises(HarnessIOError, match="contiguous"):
         EpisodeTrace(
@@ -1021,6 +1872,7 @@ def test_training_signal_report_rejects_privileged_action_signal_extraction() ->
                 "linear": [0.1, 0.0, 0.0],
                 "angular": [0.0, 0.0, 0.0],
             },
+            "official_trial_id": "trial_1",
         },
     )
     trace = _episode_trace()

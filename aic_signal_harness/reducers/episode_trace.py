@@ -22,8 +22,12 @@ from aic_signal_harness.episode_trace import (
     TimelineEvent,
     TimelineEventKind,
     TrialTrace,
+    _canonical_event_projection_sha256,
+    _hdf5_report_matches_local_bytes_errors,
 )
 from aic_signal_harness.failure import FailureLabel, FailureReport, FailureSeverity
+from aic_signal_harness.hdf5_dataset import Hdf5DatasetReport
+from aic_signal_harness.mcap_eval import McapEvalBundleReport, McapEvalTrialReport
 from aic_signal_harness.policy_trace import (
     PolicyTraceEvent,
     PolicyTraceEventType,
@@ -32,7 +36,7 @@ from aic_signal_harness.policy_trace import (
 from aic_signal_harness.reducers.policy_trace import read_policy_trace_events
 from aic_signal_harness.reward import RewardReport, RewardSignalKind, RewardTerm
 from aic_signal_harness.schemas import ArtifactRef, LeakageClass
-from aic_signal_harness.scoring import ScoreReport, TrialScore
+from aic_signal_harness.scoring import ScoreReport, TrialScore, parse_scoring_yaml
 from aic_signal_harness.training_signal import (
     TrainingSignal,
     TrainingSignalKind,
@@ -73,6 +77,8 @@ def derive_episode_trace(
     score_report: ScoreReport | Mapping[str, Any] | None = None,
     reward_report: RewardReport | Mapping[str, Any] | None = None,
     failure_report: FailureReport | Mapping[str, Any] | None = None,
+    mcap_eval_bundle: McapEvalBundleReport | Mapping[str, Any] | None = None,
+    hdf5_dataset_report: Hdf5DatasetReport | Mapping[str, Any] | None = None,
     generated_at_utc: str | None = None,
 ) -> EpisodeTrace:
     """Fuse policy events with score/reward/failure evidence into an episode trace."""
@@ -84,6 +90,12 @@ def derive_episode_trace(
     typed_score = _optional_score_report(score_report)
     typed_reward = _optional_reward_report(reward_report)
     typed_failure = _optional_failure_report(failure_report)
+    typed_mcap = _optional_mcap_eval_bundle(mcap_eval_bundle)
+    typed_hdf5 = _optional_hdf5_dataset_report(hdf5_dataset_report)
+    if typed_mcap is not None:
+        raise HarnessIOError(
+            "MCAP evidence requires the dedicated byte rederive slice/analyzer injection"
+        )
     _validate_report_run_ids(run_id, typed_reward, typed_failure)
     _validate_source_artifact_bindings(
         run_id,
@@ -92,6 +104,8 @@ def derive_episode_trace(
         typed_score,
         typed_reward,
         typed_failure,
+        typed_mcap,
+        typed_hdf5,
     )
     generated_at = (
         _episode_trace_generated_at(
@@ -99,6 +113,8 @@ def derive_episode_trace(
             score_report=typed_score,
             reward_report=typed_reward,
             failure_report=typed_failure,
+            mcap_eval_bundle=typed_mcap,
+            hdf5_dataset_report=typed_hdf5,
         )
         if generated_at_utc is None
         else generated_at_utc
@@ -107,11 +123,15 @@ def derive_episode_trace(
     events_by_trial = _events_by_trial(policy_events)
     official_trial_by_policy = _official_trial_ids_by_policy_trial(
         events_by_trial,
-        require_complete=typed_score is not None,
+        require_complete=typed_score is not None or typed_mcap is not None,
     )
     trial_scores = _scores_by_policy_trial(
         official_trial_by_policy,
         typed_score,
+    )
+    mcap_trials = _mcap_trials_by_policy_trial(
+        official_trial_by_policy,
+        typed_mcap,
     )
     trials = tuple(
         _trial_trace(
@@ -121,20 +141,30 @@ def derive_episode_trace(
         )
         for trial_id, trial_events in events_by_trial.items()
     )
+    run_events = _run_events(
+        score_report=typed_score,
+        reward_report=typed_reward,
+        failure_report=typed_failure,
+        mcap_trials=mcap_trials,
+        mcap_eval_bundle=typed_mcap,
+        hdf5_dataset_report=typed_hdf5,
+        start_index=sum(trial.event_count for trial in trials),
+        trial_bounds={trial.trial_id: (trial.start_elapsed_sec, trial.end_elapsed_sec) for trial in trials},
+        official_trial_by_policy=official_trial_by_policy,
+    )
     return EpisodeTrace(
         run_id=run_id,
         generated_at_utc=generated_at,
-        source_artifacts=source_artifacts,
-        trials=trials,
-        run_events=_run_events(
+        source_artifacts=_source_artifacts_with_event_projection(
+            source_artifacts,
+            run_events,
             score_report=typed_score,
-            reward_report=typed_reward,
-            failure_report=typed_failure,
-            start_index=sum(trial.event_count for trial in trials),
-            trial_bounds={trial.trial_id: (trial.start_elapsed_sec, trial.end_elapsed_sec) for trial in trials},
-            official_trial_by_policy=official_trial_by_policy,
+            mcap_eval_bundle=typed_mcap,
+            hdf5_dataset_report=typed_hdf5,
         ),
-        notes=(_episode_trace_note(typed_score, typed_reward, typed_failure),),
+        trials=trials,
+        run_events=run_events,
+        notes=(_episode_trace_note(typed_score, typed_reward, typed_failure, typed_mcap, typed_hdf5),),
     )
 
 
@@ -193,6 +223,7 @@ def _trial_trace(
         start_elapsed_sec=policy_events[0].elapsed_sec,
         end_elapsed_sec=policy_events[-1].elapsed_sec,
         event_count=len(timeline),
+        observation_event_count=event_kinds[TimelineEventKind.observation_event],
         action_event_count=event_kinds[TimelineEventKind.action_event],
         nonzero_action_event_count=sum(
             event.event_kind is TimelineEventKind.action_event and _action_event_is_nonzero(event)
@@ -225,6 +256,8 @@ def _timeline_event_from_policy(event: PolicyTraceEvent) -> TimelineEvent:
 
 
 def _timeline_kind(event_type: PolicyTraceEventType) -> TimelineEventKind:
+    if event_type is PolicyTraceEventType.observation:
+        return TimelineEventKind.observation_event
     if event_type in (PolicyTraceEventType.action_selected, PolicyTraceEventType.action_published):
         return TimelineEventKind.action_event
     if event_type is PolicyTraceEventType.safety_guard:
@@ -239,6 +272,9 @@ def _run_events(
     score_report: ScoreReport | None,
     reward_report: RewardReport | None,
     failure_report: FailureReport | None,
+    mcap_trials: Mapping[str, McapEvalTrialReport],
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
     start_index: int,
     trial_bounds: Mapping[str, tuple[float, float]],
     official_trial_by_policy: Mapping[str, str],
@@ -246,6 +282,41 @@ def _run_events(
     events: list[TimelineEvent] = []
     next_index = start_index
     run_window = _run_evidence_window(trial_bounds)
+    if hdf5_dataset_report is not None:
+        events.append(
+            _dataset_summary_event(
+                hdf5_dataset_report,
+                next_index,
+                run_window,
+                _report_sha256(hdf5_dataset_report.to_dict()),
+            )
+        )
+        next_index += 1
+    if mcap_eval_bundle is not None:
+        mcap_report_sha256 = _report_sha256(mcap_eval_bundle.to_dict())
+        for policy_trial_id, mcap_trial in mcap_trials.items():
+            events.append(
+                _controller_summary_event(
+                    mcap_trial=mcap_trial,
+                    event_index=next_index,
+                    policy_trial_id=policy_trial_id,
+                    trial_bounds=trial_bounds,
+                    analyzed_at_utc=mcap_eval_bundle.analyzed_at_utc,
+                    source_report_sha256=mcap_report_sha256,
+                )
+            )
+            next_index += 1
+            events.append(
+                _contact_evidence_event(
+                    mcap_trial=mcap_trial,
+                    event_index=next_index,
+                    policy_trial_id=policy_trial_id,
+                    trial_bounds=trial_bounds,
+                    analyzed_at_utc=mcap_eval_bundle.analyzed_at_utc,
+                    source_report_sha256=mcap_report_sha256,
+                )
+            )
+            next_index += 1
     if score_report is not None:
         events.append(
             TimelineEvent(
@@ -277,6 +348,265 @@ def _run_events(
             events.append(_failure_event(label, next_index, trial_bounds, run_window, official_trial_by_policy))
             next_index += 1
     return tuple(events)
+
+
+def _source_artifacts_with_event_projection(
+    source_artifacts: tuple[ArtifactRef, ...],
+    run_events: tuple[TimelineEvent, ...],
+    *,
+    score_report: ScoreReport | None,
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
+) -> tuple[ArtifactRef, ...]:
+    mcap_events = tuple(
+        event
+        for event in run_events
+        if event.event_kind in {
+            TimelineEventKind.controller_summary,
+            TimelineEventKind.contact_evidence,
+        }
+    )
+    dataset_events = tuple(
+        event
+        for event in run_events
+        if event.event_kind is TimelineEventKind.dataset_episode_summary
+    )
+    score_events = tuple(
+        event for event in run_events if event.event_kind is TimelineEventKind.official_score
+    )
+    return tuple(
+        _source_artifact_with_projection(
+            artifact,
+            score_events=score_events,
+            mcap_events=mcap_events,
+            dataset_events=dataset_events,
+            score_report=score_report,
+            mcap_eval_bundle=mcap_eval_bundle,
+            hdf5_dataset_report=hdf5_dataset_report,
+        )
+        for artifact in source_artifacts
+    )
+
+
+def _source_artifact_with_projection(
+    artifact: ArtifactRef,
+    *,
+    score_events: tuple[TimelineEvent, ...],
+    mcap_events: tuple[TimelineEvent, ...],
+    dataset_events: tuple[TimelineEvent, ...],
+    score_report: ScoreReport | None,
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
+) -> ArtifactRef:
+    if artifact.kind == "scoring_yaml" and score_events and score_report is not None:
+        return _artifact_with_event_projection(
+            artifact,
+            score_events,
+            source_report=score_report.to_dict(),
+            include_source_report=True,
+        )
+    if artifact.kind == "mcap_eval_bundle" and mcap_events and mcap_eval_bundle is not None:
+        return _artifact_with_event_projection(artifact, mcap_events, source_report=mcap_eval_bundle.to_dict())
+    if artifact.kind == "hdf5_dataset" and dataset_events and hdf5_dataset_report is not None:
+        return _artifact_with_event_projection(artifact, dataset_events, source_report=hdf5_dataset_report.to_dict())
+    return artifact
+
+
+def _artifact_with_event_projection(
+    artifact: ArtifactRef,
+    events: tuple[TimelineEvent, ...],
+    *,
+    source_report: Mapping[str, Any],
+    include_source_report: bool = False,
+) -> ArtifactRef:
+    event_sha256 = _canonical_event_projection_sha256(events)
+    report_sha256 = _report_sha256(source_report)
+    existing_report_sha256 = artifact.provenance.get("report_sha256")
+    if existing_report_sha256 is not None and existing_report_sha256 != report_sha256:
+        raise HarnessIOError(
+            f"{artifact.kind} source artifact provenance.report_sha256 must match supplied report"
+        )
+    existing_report_projection = artifact.provenance.get("source_report_event_projection_sha256")
+    if existing_report_projection is not None and existing_report_projection != event_sha256:
+        raise HarnessIOError(
+            f"{artifact.kind} source artifact provenance.source_report_event_projection_sha256 "
+            "must match derived events"
+        )
+    existing = artifact.provenance.get("canonical_event_projection_sha256")
+    if existing is not None and existing != event_sha256:
+        raise HarnessIOError(
+            f"{artifact.kind} source artifact provenance.canonical_event_projection_sha256 "
+            "must match derived events"
+        )
+    existing_source_report = artifact.provenance.get("source_report")
+    if existing_source_report is not None:
+        if not include_source_report:
+            raise HarnessIOError(
+                f"{artifact.kind} source artifact provenance.source_report must not be set; "
+                "use the typed report source artifact instead"
+            )
+        if not isinstance(existing_source_report, Mapping):
+            raise HarnessIOError(
+                f"{artifact.kind} source artifact provenance.source_report must be a mapping"
+            )
+        if _report_sha256(existing_source_report) != report_sha256:
+            raise HarnessIOError(
+                f"{artifact.kind} source artifact provenance.source_report must match supplied report"
+            )
+    provenance = {key: value for key, value in artifact.provenance.items() if key != "source_report"}
+    provenance.update(
+        {
+            "report_sha256": report_sha256,
+            "source_report_event_projection_sha256": event_sha256,
+            "canonical_event_projection_sha256": event_sha256,
+        }
+    )
+    if include_source_report:
+        provenance["source_report"] = source_report
+    return ArtifactRef(
+        kind=artifact.kind,
+        path=artifact.path,
+        uri=artifact.uri,
+        sha256=artifact.sha256,
+        provenance=provenance,
+    )
+
+
+def _dataset_summary_event(
+    report: Hdf5DatasetReport,
+    event_index: int,
+    run_window: Mapping[str, float],
+    source_report_sha256: str,
+) -> TimelineEvent:
+    return TimelineEvent(
+        event_index=event_index,
+        event_kind=TimelineEventKind.dataset_episode_summary,
+        elapsed_sec=run_window["start_elapsed_sec"],
+        source=report.source,
+        leakage_class=LeakageClass.privileged_training_signal,
+        payload={
+            "event_scope": "offline_dataset_summary",
+            "source_report_sha256": source_report_sha256,
+            "evidence_window": run_window,
+            "validated_at_utc": report.validated_at_utc,
+            "ok": report.ok,
+            "episode_count": report.episode_count,
+            "step_count": report.step_count,
+            "episode_lengths": list(report.episode_lengths),
+            "episode_offsets": list(report.episode_offsets),
+            "required_datasets": list(report.required_datasets),
+            "missing_datasets": list(report.missing_datasets),
+            "observation_datasets": _dataset_stats_payload(
+                report,
+                ("pixels", "left_pixels", "right_pixels", "proprio", "state"),
+            ),
+            "action_datasets": _dataset_stats_payload(report, ("action",)),
+            "task_datasets": _dataset_stats_payload(
+                report,
+                ("task_id", "plug_type", "port_type", "target_module_name"),
+            ),
+        },
+        emitted_at_utc=report.validated_at_utc,
+    )
+
+
+def _controller_summary_event(
+    *,
+    mcap_trial: McapEvalTrialReport,
+    event_index: int,
+    policy_trial_id: str,
+    trial_bounds: Mapping[str, tuple[float, float]],
+    analyzed_at_utc: str,
+    source_report_sha256: str,
+) -> TimelineEvent:
+    evidence_window = _trial_evidence_window(policy_trial_id, trial_bounds)
+    payload: dict[str, Any] = {
+        "event_scope": "post_hoc_trial_evidence",
+        "source_report_sha256": source_report_sha256,
+        "official_trial_id": mcap_trial.trial_id,
+        "evidence_window": evidence_window,
+        "mcap_trial_source": mcap_trial.source,
+        "controller_state_count": mcap_trial.controller_state_count,
+        "pose_command_count": mcap_trial.pose_command_count,
+    }
+    for field_name in (
+        "controller_stamp_start_sec",
+        "controller_stamp_end_sec",
+        "controller_duration_sec",
+    ):
+        field_value = getattr(mcap_trial, field_name)
+        if field_value is not None:
+            payload[field_name] = field_value
+    for field_name in ("final_tcp_position", "final_tcp_error"):
+        field_value = getattr(mcap_trial, field_name)
+        if field_value is not None:
+            payload[field_name] = list(field_value)
+    if mcap_trial.task_hints is not None:
+        payload["task_hints"] = mcap_trial.task_hints.to_dict()
+    return TimelineEvent(
+        event_index=event_index,
+        event_kind=TimelineEventKind.controller_summary,
+        elapsed_sec=evidence_window["end_elapsed_sec"],
+        source=mcap_trial.source,
+        leakage_class=LeakageClass.privileged_eval_signal,
+        payload=payload,
+        trial_id=policy_trial_id,
+        emitted_at_utc=analyzed_at_utc,
+    )
+
+
+def _contact_evidence_event(
+    *,
+    mcap_trial: McapEvalTrialReport,
+    event_index: int,
+    policy_trial_id: str,
+    trial_bounds: Mapping[str, tuple[float, float]],
+    analyzed_at_utc: str,
+    source_report_sha256: str,
+) -> TimelineEvent:
+    evidence_window = _trial_evidence_window(policy_trial_id, trial_bounds)
+    payload: dict[str, Any] = {
+        "event_scope": "post_hoc_trial_evidence",
+        "source_report_sha256": source_report_sha256,
+        "official_trial_id": mcap_trial.trial_id,
+        "evidence_window": evidence_window,
+        "mcap_trial_source": mcap_trial.source,
+        "off_limit_contact_count": mcap_trial.off_limit_contact_count,
+    }
+    if mcap_trial.first_off_limit_contact is not None:
+        payload["first_off_limit_contact"] = mcap_trial.first_off_limit_contact.to_dict()
+    return TimelineEvent(
+        event_index=event_index,
+        event_kind=TimelineEventKind.contact_evidence,
+        elapsed_sec=evidence_window["end_elapsed_sec"],
+        source=mcap_trial.source,
+        leakage_class=LeakageClass.privileged_eval_signal,
+        payload=payload,
+        trial_id=policy_trial_id,
+        emitted_at_utc=analyzed_at_utc,
+    )
+
+
+def _dataset_stats_payload(
+    report: Hdf5DatasetReport,
+    dataset_names: tuple[str, ...],
+) -> dict[str, dict[str, Any]]:
+    return {
+        dataset_name: report.datasets[dataset_name].to_dict()
+        for dataset_name in dataset_names
+        if dataset_name in report.datasets
+    }
+
+
+def _trial_evidence_window(
+    trial_id: str,
+    trial_bounds: Mapping[str, tuple[float, float]],
+) -> Mapping[str, float]:
+    start_elapsed_sec, end_elapsed_sec = trial_bounds[trial_id]
+    return {
+        "start_elapsed_sec": start_elapsed_sec,
+        "end_elapsed_sec": end_elapsed_sec,
+    }
 
 
 def _reward_event(
@@ -426,6 +756,41 @@ def _scores_by_policy_trial(
     }
 
 
+def _mcap_trials_by_policy_trial(
+    policy_to_official: Mapping[str, str],
+    mcap_eval_bundle: McapEvalBundleReport | None,
+) -> dict[str, McapEvalTrialReport]:
+    if mcap_eval_bundle is None:
+        return {}
+    duplicate_official = _duplicate_values(policy_to_official)
+    if duplicate_official:
+        raise HarnessIOError(
+            "policy trial ids map ambiguously to MCAP eval trials: "
+            + ", ".join(duplicate_official)
+        )
+    official_to_mcap = {trial.trial_id: trial for trial in mcap_eval_bundle.trials}
+    policy_official_ids = set(policy_to_official.values())
+    mcap_official_ids = set(official_to_mcap)
+    if policy_official_ids != mcap_official_ids:
+        missing_mcap = sorted(policy_official_ids - mcap_official_ids)
+        extra_mcap = sorted(mcap_official_ids - policy_official_ids)
+        details = []
+        if missing_mcap:
+            details.append("missing MCAP evidence for " + ", ".join(missing_mcap))
+        if extra_mcap:
+            details.append("unmatched MCAP evidence " + ", ".join(extra_mcap))
+        raise HarnessIOError("MCAP eval trials must explicitly match policy trials: " + "; ".join(details))
+    return {
+        policy_trial_id: official_to_mcap[official_trial_id]
+        for policy_trial_id, official_trial_id in policy_to_official.items()
+    }
+
+
+def _duplicate_values(value: Mapping[str, str]) -> list[str]:
+    counts = Counter(value.values())
+    return sorted(item for item, count in counts.items() if count > 1)
+
+
 def _action_event_is_nonzero(event: TimelineEvent) -> bool:
     payload = event.payload.get("policy_payload")
     return isinstance(payload, Mapping) and action_payload_is_nonzero(payload)
@@ -532,6 +897,22 @@ def _optional_failure_report(value: FailureReport | Mapping[str, Any] | None) ->
     return value if isinstance(value, FailureReport) else FailureReport.from_dict(value)
 
 
+def _optional_mcap_eval_bundle(
+    value: McapEvalBundleReport | Mapping[str, Any] | None,
+) -> McapEvalBundleReport | None:
+    if value is None:
+        return None
+    return value if isinstance(value, McapEvalBundleReport) else McapEvalBundleReport.from_dict(value)
+
+
+def _optional_hdf5_dataset_report(
+    value: Hdf5DatasetReport | Mapping[str, Any] | None,
+) -> Hdf5DatasetReport | None:
+    if value is None:
+        return None
+    return value if isinstance(value, Hdf5DatasetReport) else Hdf5DatasetReport.from_dict(value)
+
+
 def _validate_report_run_ids(
     run_id: str,
     reward_report: RewardReport | None,
@@ -620,6 +1001,8 @@ def _episode_trace_note(
     score_report: ScoreReport | None,
     reward_report: RewardReport | None,
     failure_report: FailureReport | None,
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
 ) -> str:
     inputs = ["policy JSONL"]
     if score_report is not None:
@@ -628,6 +1011,10 @@ def _episode_trace_note(
         inputs.append("reward report")
     if failure_report is not None:
         inputs.append("failure report")
+    if mcap_eval_bundle is not None:
+        inputs.append("MCAP eval bundle")
+    if hdf5_dataset_report is not None:
+        inputs.append("HDF5 dataset report")
     return "Canonical episode trace fused from " + ", ".join(inputs) + "."
 
 
@@ -637,6 +1024,8 @@ def _episode_trace_generated_at(
     score_report: ScoreReport | None,
     reward_report: RewardReport | None,
     failure_report: FailureReport | None,
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
 ) -> str:
     candidates = [("policy trace last event emitted_at_utc", policy_events[-1].emitted_at_utc)]
     if score_report is not None and score_report.parsed_at_utc is not None:
@@ -645,6 +1034,10 @@ def _episode_trace_generated_at(
         candidates.append(("reward_report.generated_at_utc", reward_report.generated_at_utc))
     if failure_report is not None:
         candidates.append(("failure_report.generated_at_utc", failure_report.generated_at_utc))
+    if mcap_eval_bundle is not None:
+        candidates.append(("mcap_eval_bundle.analyzed_at_utc", mcap_eval_bundle.analyzed_at_utc))
+    if hdf5_dataset_report is not None:
+        candidates.append(("hdf5_dataset_report.validated_at_utc", hdf5_dataset_report.validated_at_utc))
     return _max_utc_timestamp(candidates)
 
 
@@ -718,6 +1111,8 @@ def _validate_source_artifact_bindings(
     score_report: ScoreReport | None,
     reward_report: RewardReport | None,
     failure_report: FailureReport | None,
+    mcap_eval_bundle: McapEvalBundleReport | None,
+    hdf5_dataset_report: Hdf5DatasetReport | None,
 ) -> None:
     errors: list[str] = []
     for artifact in source_artifacts:
@@ -736,6 +1131,8 @@ def _validate_source_artifact_bindings(
             if not _artifact_names_source(scoring_artifact, score_report.source):
                 errors.append("scoring_yaml source artifact must match score_report.source")
         errors.extend(_scoring_artifact_digest_errors(scoring_artifact))
+        if score_report is not None:
+            errors.extend(_score_report_matches_scoring_artifact_errors(scoring_artifact, score_report))
     policy_artifacts = tuple(
         artifact for artifact in source_artifacts if artifact.kind == "policy_trace_jsonl"
     )
@@ -782,8 +1179,172 @@ def _validate_source_artifact_bindings(
             report=failure_report,
         )
     )
+    errors.extend(
+        _mcap_source_artifact_errors(
+            source_artifacts=source_artifacts,
+            report=mcap_eval_bundle,
+        )
+    )
+    errors.extend(
+        _hdf5_source_artifact_errors(
+            source_artifacts=source_artifacts,
+            report=hdf5_dataset_report,
+        )
+    )
     if errors:
         raise HarnessIOError("; ".join(errors))
+
+
+def _mcap_source_artifact_errors(
+    *,
+    source_artifacts: tuple[ArtifactRef, ...],
+    report: McapEvalBundleReport | None,
+) -> list[str]:
+    artifacts = tuple(artifact for artifact in source_artifacts if artifact.kind == "mcap_eval_bundle")
+    source_report_errors = _forbidden_raw_source_report_errors(
+        artifacts,
+        kind="mcap_eval_bundle",
+        report_kind="mcap_eval_report",
+    )
+    unattached_report_errors = _unattached_typed_report_artifact_errors(
+        source_artifacts,
+        kind="mcap_eval_report",
+        report_name="mcap_eval_bundle",
+    )
+    if report is None:
+        if len(artifacts) > 1:
+            return (
+                source_report_errors
+                + unattached_report_errors
+                + ["episode trace.source_artifacts must include at most one mcap_eval_bundle"]
+            )
+        if len(artifacts) == 1:
+            return (
+                source_report_errors
+                + unattached_report_errors
+                + _quiet_local_mcap_bundle_artifact_errors(artifacts[0])
+            )
+        return source_report_errors + unattached_report_errors
+    if len(artifacts) != 1:
+        return source_report_errors + ["episode trace.source_artifacts must include exactly one mcap_eval_bundle"]
+    artifact = artifacts[0]
+    errors: list[str] = list(source_report_errors)
+    if artifact.sha256 is None:
+        errors.append("mcap_eval_bundle source artifact sha256 must be set")
+    elif artifact.sha256 != _mcap_bundle_sha256_from_report(report):
+        errors.append("mcap_eval_bundle source artifact sha256 must match supplied report")
+    errors.extend(
+        _report_sha256_provenance_errors(
+            artifact=artifact,
+            expected_report_sha256=_report_sha256(report.to_dict()),
+            label="mcap_eval_bundle",
+        )
+    )
+    errors.extend(
+        _typed_report_source_artifact_errors(
+            source_artifacts=source_artifacts,
+            kind="mcap_eval_report",
+            report=report.to_dict(),
+        )
+    )
+    if not _artifact_names_source(artifact, report.source):
+        errors.append("mcap_eval_bundle source artifact must match mcap_eval_bundle.source")
+    errors.extend(_local_mcap_artifact_errors(artifact, report))
+    return errors
+
+
+def _hdf5_source_artifact_errors(
+    *,
+    source_artifacts: tuple[ArtifactRef, ...],
+    report: Hdf5DatasetReport | None,
+) -> list[str]:
+    artifacts = tuple(artifact for artifact in source_artifacts if artifact.kind == "hdf5_dataset")
+    source_report_errors = _forbidden_raw_source_report_errors(
+        artifacts,
+        kind="hdf5_dataset",
+        report_kind="hdf5_dataset_report",
+    )
+    if report is None:
+        unattached_report_errors = _unattached_typed_report_artifact_errors(
+            source_artifacts,
+            kind="hdf5_dataset_report",
+            report_name="hdf5_dataset",
+        )
+        if len(artifacts) > 1:
+            return (
+                source_report_errors
+                + unattached_report_errors
+                + ["episode trace.source_artifacts must include at most one hdf5_dataset"]
+            )
+        if len(artifacts) == 1:
+            return (
+                source_report_errors
+                + unattached_report_errors
+                + _quiet_local_hdf5_artifact_errors(artifacts[0])
+            )
+        return source_report_errors + unattached_report_errors
+    if len(artifacts) != 1:
+        return source_report_errors + ["episode trace.source_artifacts must include exactly one hdf5_dataset"]
+    artifact = artifacts[0]
+    errors: list[str] = list(source_report_errors)
+    if artifact.sha256 is None:
+        errors.append("hdf5_dataset source artifact sha256 must be set")
+    elif artifact.sha256 != report.sha256:
+        errors.append("hdf5_dataset source artifact sha256 must match hdf5_dataset_report.sha256")
+    errors.extend(
+        _report_sha256_provenance_errors(
+            artifact=artifact,
+            expected_report_sha256=_report_sha256(report.to_dict()),
+            label="hdf5_dataset",
+        )
+    )
+    errors.extend(
+        _typed_report_source_artifact_errors(
+            source_artifacts=source_artifacts,
+            kind="hdf5_dataset_report",
+            report=report.to_dict(),
+        )
+    )
+    if not _artifact_names_source(artifact, report.source):
+        errors.append("hdf5_dataset source artifact must match hdf5_dataset_report.source")
+    errors.extend(_local_hdf5_artifact_errors(artifact))
+    errors.extend(
+        _hdf5_report_matches_local_bytes_errors(
+            source_artifact=artifact,
+            report=report,
+            label="hdf5_dataset",
+        )
+    )
+    return errors
+
+
+def _forbidden_raw_source_report_errors(
+    artifacts: tuple[ArtifactRef, ...],
+    *,
+    kind: str,
+    report_kind: str,
+) -> list[str]:
+    return [
+        f"{kind} source artifact provenance.source_report must not be set; "
+        f"use the {report_kind} source artifact instead"
+        for artifact in artifacts
+        if artifact.provenance.get("source_report") is not None
+    ]
+
+
+def _unattached_typed_report_artifact_errors(
+    source_artifacts: tuple[ArtifactRef, ...],
+    *,
+    kind: str,
+    report_name: str,
+) -> list[str]:
+    artifacts = tuple(artifact for artifact in source_artifacts if artifact.kind == kind)
+    if not artifacts:
+        return []
+    return [
+        f"episode trace.source_artifacts must not include {kind} without "
+        f"{report_name} evidence"
+    ]
 
 
 def _artifact_names_source(artifact: ArtifactRef, source: str) -> bool:
@@ -830,6 +1391,232 @@ def _scoring_artifact_digest_errors(artifact: ArtifactRef) -> list[str]:
     if sha256_file(scoring_path) != artifact.sha256:
         return ["scoring_yaml source artifact sha256 must match path"]
     return []
+
+
+def _score_report_matches_scoring_artifact_errors(
+    artifact: ArtifactRef,
+    score_report: ScoreReport,
+) -> list[str]:
+    expected_report_sha256 = _report_sha256(score_report.to_dict())
+    artifact_report_sha256 = artifact.provenance.get("report_sha256")
+    if artifact_report_sha256 is not None and artifact_report_sha256 != expected_report_sha256:
+        return ["scoring_yaml source artifact provenance.report_sha256 must match score_report"]
+    try:
+        scoring_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name="scoring_yaml source artifact",
+        )
+    except HarnessIOError:
+        scoring_path = None
+    if scoring_path is None or not scoring_path.exists() or not scoring_path.is_file():
+        return ["scoring_yaml source artifact must be a local scoring.yaml snapshot when score_report is supplied"]
+    try:
+        parsed_score = parse_scoring_yaml(scoring_path)
+    except HarnessIOError as exc:
+        return [f"scoring_yaml source artifact must parse as a ScoreReport: {exc}"]
+    source_aliases = tuple(
+        source
+        for source in (
+            parsed_score.source,
+            score_report.source,
+            artifact.path,
+            artifact.uri,
+            str(scoring_path.resolve(strict=False)),
+        )
+        if source is not None
+    )
+    if not parsed_score.equivalent_to(score_report, source_aliases=source_aliases):
+        return ["score_report must match scoring_yaml source artifact bytes"]
+    return []
+
+
+def _local_hdf5_artifact_errors(artifact: ArtifactRef) -> list[str]:
+    try:
+        dataset_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name="hdf5_dataset source artifact",
+        )
+    except HarnessIOError as exc:
+        return [str(exc)]
+    if dataset_path is None:
+        return ["hdf5_dataset source artifact must be a local byte-verifiable file"]
+    if not dataset_path.exists():
+        return ["hdf5_dataset source artifact path must exist"]
+    if not dataset_path.is_file():
+        return ["hdf5_dataset source artifact path must be a file"]
+    if artifact.sha256 is not None and sha256_file(dataset_path) != artifact.sha256:
+        return ["hdf5_dataset source artifact sha256 must match path"]
+    return []
+
+
+def _quiet_local_hdf5_artifact_errors(artifact: ArtifactRef) -> list[str]:
+    try:
+        dataset_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name="hdf5_dataset source artifact",
+        )
+    except HarnessIOError as exc:
+        return [str(exc)]
+    if dataset_path is None:
+        return []
+    if not dataset_path.exists():
+        return ["hdf5_dataset source artifact path must exist"]
+    if not dataset_path.is_file():
+        return ["hdf5_dataset source artifact path must be a file"]
+    if artifact.sha256 is not None and sha256_file(dataset_path) != artifact.sha256:
+        return ["hdf5_dataset source artifact sha256 must match path"]
+    return []
+
+
+def _local_mcap_artifact_errors(
+    artifact: ArtifactRef,
+    report: McapEvalBundleReport,
+) -> list[str]:
+    errors = _local_mcap_bundle_artifact_errors(artifact)
+    if errors:
+        return errors
+    for trial in report.trials:
+        if _is_uri_source(trial.source):
+            continue
+        trial_path = Path(trial.source)
+        if not trial_path.exists():
+            errors.append(f"mcap_eval_bundle trial source path must exist: {trial.trial_id}")
+        elif not trial_path.is_file():
+            errors.append(f"mcap_eval_bundle trial source path must be a file: {trial.trial_id}")
+        elif sha256_file(trial_path) != trial.sha256:
+            errors.append(f"mcap_eval_bundle trial source sha256 must match path: {trial.trial_id}")
+    return errors
+
+
+def _quiet_local_mcap_bundle_artifact_errors(artifact: ArtifactRef) -> list[str]:
+    try:
+        bundle_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name="mcap_eval_bundle source artifact",
+        )
+    except HarnessIOError as exc:
+        return [str(exc)]
+    if bundle_path is None:
+        return []
+    errors: list[str] = []
+    if not bundle_path.exists():
+        errors.append("mcap_eval_bundle source artifact path must exist")
+    elif not bundle_path.is_dir():
+        errors.append("mcap_eval_bundle source artifact path must be a directory")
+    return errors
+
+
+def _local_mcap_bundle_artifact_errors(artifact: ArtifactRef) -> list[str]:
+    try:
+        bundle_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name="mcap_eval_bundle source artifact",
+        )
+    except HarnessIOError as exc:
+        return [str(exc)]
+    if bundle_path is None:
+        return ["mcap_eval_bundle source artifact must be a local byte-verifiable directory"]
+    errors: list[str] = []
+    if not bundle_path.exists():
+        errors.append("mcap_eval_bundle source artifact path must exist")
+    elif not bundle_path.is_dir():
+        errors.append("mcap_eval_bundle source artifact path must be a directory")
+    return errors
+
+
+def _mcap_bundle_sha256_from_report(report: McapEvalBundleReport) -> str:
+    digest = hashlib.sha256()
+    bundle_root = Path(report.source) if not _is_uri_source(report.source) else None
+    for trial in report.trials:
+        trial_identity = (
+            Path(trial.source).relative_to(bundle_root).as_posix()
+            if bundle_root is not None
+            else trial.source
+        )
+        digest.update(trial.trial_id.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(trial_identity.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(trial.size_bytes).encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(trial.sha256.encode("ascii"))
+        digest.update(b"\n")
+    return digest.hexdigest()
+
+
+def _report_sha256(mapping: Mapping[str, Any]) -> str:
+    payload = (
+        json.dumps(_plain_json_value(mapping), allow_nan=False, indent=2, sort_keys=True)
+        + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _plain_json_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _plain_json_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_json_value(item) for item in value]
+    return value
+
+
+def _typed_report_source_artifact_errors(
+    *,
+    source_artifacts: tuple[ArtifactRef, ...],
+    kind: str,
+    report: Mapping[str, Any],
+) -> list[str]:
+    artifacts = tuple(artifact for artifact in source_artifacts if artifact.kind == kind)
+    if len(artifacts) != 1:
+        return [f"episode trace.source_artifacts must include exactly one {kind}"]
+    artifact = artifacts[0]
+    errors: list[str] = []
+    if artifact.sha256 is None:
+        errors.append(f"{kind} source artifact sha256 must be set")
+    try:
+        report_path = local_artifact_path(
+            path=artifact.path,
+            uri=artifact.uri,
+            field_name=f"{kind} source artifact",
+        )
+    except HarnessIOError as exc:
+        return errors + [str(exc)]
+    if report_path is None:
+        errors.append(f"{kind} source artifact must be a local JSON file")
+    elif not report_path.exists():
+        errors.append(f"{kind} source artifact path must exist")
+    elif not report_path.is_file():
+        errors.append(f"{kind} source artifact path must be a file")
+    elif artifact.sha256 != sha256_file(report_path):
+        errors.append(f"{kind} source artifact sha256 must match path")
+    else:
+        persisted = read_json(report_path)
+        if persisted != report:
+            errors.append(f"{kind} source artifact must match supplied report")
+    return errors
+
+
+def _report_sha256_provenance_errors(
+    *,
+    artifact: ArtifactRef,
+    expected_report_sha256: str,
+    label: str,
+) -> list[str]:
+    value = artifact.provenance.get("report_sha256")
+    if not _looks_like_sha256(value):
+        return [f"{label} source artifact provenance.report_sha256 must be set"]
+    if value != expected_report_sha256:
+        return [f"{label} source artifact provenance.report_sha256 must match supplied report"]
+    return []
+
+
+def _is_uri_source(source: str) -> bool:
+    return "://" in source
 
 
 def _report_source_artifact_errors(

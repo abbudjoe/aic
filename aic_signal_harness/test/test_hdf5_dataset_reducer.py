@@ -1,5 +1,7 @@
 import hashlib
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -14,6 +16,13 @@ from aic_signal_harness import (
     sha256_file,
     validate_hdf5_dataset,
 )
+
+
+def _report_sha256(mapping: dict[str, Any]) -> str:
+    payload = (
+        json.dumps(mapping, allow_nan=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _write_valid_dataset(path: Path, *, episode_lengths: tuple[int, ...] = (2,)) -> None:
@@ -202,10 +211,63 @@ def test_reduce_hdf5_dataset_binds_artifact_to_report(tmp_path: Path) -> None:
     assert reduction.artifact.path == str(dataset)
     assert reduction.artifact.uri is None
     assert reduction.artifact.sha256 == reduction.report.sha256 == sha256_file(dataset)
-    assert reduction.artifact.provenance == {
-        "producer": "pytest",
-        "declared_uri": "gs://bucket/datasets/rollout.hdf5",
-    }
+    assert reduction.artifact.provenance["producer"] == "pytest"
+    assert reduction.artifact.provenance["declared_uri"] == "gs://bucket/datasets/rollout.hdf5"
+    assert isinstance(reduction.artifact.provenance["report_sha256"], str)
+    assert len(reduction.artifact.provenance["report_sha256"]) == 64
+
+
+def test_reduce_hdf5_dataset_rejects_conflicting_report_sha256_provenance(tmp_path: Path) -> None:
+    dataset = tmp_path / "rollout.hdf5"
+    _write_valid_dataset(dataset)
+
+    with pytest.raises(
+        HarnessIOError,
+        match="provenance.report_sha256 must match reducer report",
+    ):
+        reduce_hdf5_dataset(
+            dataset,
+            provenance={"report_sha256": "0" * 64},
+            validated_at_utc="2026-04-23T12:00:00Z",
+        )
+
+
+def test_hdf5_dataset_reduction_requires_bound_report_sha256() -> None:
+    report = Hdf5DatasetReport(
+        source="/tmp/demo.hdf5",
+        size_bytes=123,
+        sha256="a" * 64,
+        validated_at_utc="2026-04-23T12:00:00Z",
+        thresholds=Hdf5DatasetThresholds(min_episodes=1, min_steps=1),
+        required_datasets=("ep_len",),
+        missing_datasets=("ep_len",),
+        datasets={},
+        errors=("missing required datasets: ep_len",),
+        ok=False,
+    )
+
+    with pytest.raises(HarnessIOError, match="provenance.report_sha256"):
+        Hdf5DatasetReduction(
+            artifact=ArtifactRef(
+                kind="hdf5_dataset",
+                path=report.source,
+                sha256=report.sha256,
+                provenance={"report_sha256": "0" * 64},
+            ),
+            report=report,
+        )
+
+    reduction = Hdf5DatasetReduction(
+        artifact=ArtifactRef(
+            kind="hdf5_dataset",
+            path=report.source,
+            sha256=report.sha256,
+            provenance={"report_sha256": _report_sha256(report.to_dict())},
+        ),
+        report=report,
+    )
+
+    assert reduction.report == report
 
 
 def test_hdf5_dataset_reduction_rejects_malformed_evidence() -> None:
