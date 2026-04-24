@@ -30,6 +30,7 @@ from aic_signal_harness.reducers import (
     attach_scoring_yaml_reduction,
     build_ledger_entry,
     derive_episode_trace,
+    derive_next_experiment_plan,
     derive_next_experiment_report,
     derive_reward_failure_reports,
     derive_training_signal_report,
@@ -132,6 +133,7 @@ class LiveEvalFinalization:
     training_signal_report_path: Path | None = None
     promotion_path: Path | None = None
     next_experiment_path: Path | None = None
+    next_experiment_plan_path: Path | None = None
     ledger_path: Path | None = None
 
     def to_summary(self) -> dict[str, Any]:
@@ -153,6 +155,7 @@ class LiveEvalFinalization:
             "reward_report_path": str(self.reward_report_path),
             "failure_report_path": str(self.failure_report_path),
             "next_experiment_path": _optional_path(self.next_experiment_path),
+            "next_experiment_plan_path": _optional_path(self.next_experiment_plan_path),
         }
 
 
@@ -235,6 +238,9 @@ def finalize_live_eval_run(
     failure_report_path = harness_root / "failure_report.json"
     next_experiment_path = (
         harness_root / "next_experiment.json" if write_next_experiment else None
+    )
+    next_experiment_plan_path = (
+        harness_root / "next_experiment_plan.json" if write_next_experiment else None
     )
     ledger_entry_path = harness_root / "ledger_entry.json"
     summary_path = harness_root / "live_eval_summary.json"
@@ -322,6 +328,7 @@ def finalize_live_eval_run(
             reward_report_path,
             failure_report_path,
             next_experiment_path,
+            next_experiment_plan_path,
             ledger_entry_path,
             summary_path,
         ),
@@ -344,6 +351,7 @@ def finalize_live_eval_run(
                 reward_report_path,
                 failure_report_path,
                 next_experiment_path,
+                next_experiment_plan_path,
                 ledger_entry_path,
                 summary_path,
             ),
@@ -539,6 +547,7 @@ def finalize_live_eval_run(
 
     if write_next_experiment:
         assert next_experiment_path is not None
+        assert next_experiment_plan_path is not None
         next_experiment = derive_next_experiment_report(
             manifest,
             reward_report=reward_failure.reward_report,
@@ -549,6 +558,25 @@ def finalize_live_eval_run(
             generated_at_utc=generated_at,
         )
         write_json(next_experiment_path, next_experiment.to_dict(), overwrite=overwrite)
+        next_experiment_artifact = ArtifactRef(
+            kind="next_experiment_report",
+            path=str(next_experiment_path),
+            sha256=sha256_file(next_experiment_path),
+            provenance={
+                "producer": "aic_signal_harness.live_eval",
+                "run_id": run_id,
+                "gate_id": gate_id,
+                "derivation": "derive_next_experiment_report",
+            },
+        )
+        next_experiment_plan = derive_next_experiment_plan(
+            next_experiment,
+            manifest=manifest,
+            source_next_experiment=next_experiment_artifact,
+            source_manifest=manifest_artifact,
+            generated_at_utc=generated_at,
+        )
+        write_json(next_experiment_plan_path, next_experiment_plan.to_dict(), overwrite=overwrite)
 
     ledger_entry = build_ledger_entry(
         manifest,
@@ -574,6 +602,7 @@ def finalize_live_eval_run(
         reward_report_path=reward_report_path,
         failure_report_path=failure_report_path,
         next_experiment_path=next_experiment_path,
+        next_experiment_plan_path=next_experiment_plan_path,
         summary_path=summary_path,
     )
     staged_promotion_path = None

@@ -17,6 +17,10 @@ from aic_signal_harness import (
     NextExperimentCandidate,
     NextExperimentCandidateKind,
     NextExperimentDecision,
+    NextExperimentExecutionMode,
+    NextExperimentPlan,
+    NextExperimentPlanCandidate,
+    NextExperimentPlanStatus,
     NextExperimentPriority,
     NextExperimentReport,
     PolicyBackendSpec,
@@ -36,9 +40,11 @@ from aic_signal_harness import (
     TrainingSourceKind,
     TrialScore,
     backfill_legacy_replay_policy_eval,
+    derive_next_experiment_plan,
     derive_next_experiment_report,
     derive_reward_failure_reports,
     sha256_file,
+    write_json,
 )
 
 
@@ -283,6 +289,37 @@ def _run_dir(run_id: str) -> Path:
     return RUNS_ROOT / run_id
 
 
+def _write_source_artifacts(
+    tmp_path: Path,
+    *,
+    manifest: RunManifest,
+    next_experiment: NextExperimentReport,
+) -> tuple[ArtifactRef, ArtifactRef]:
+    manifest_path = tmp_path / "run_manifest.json"
+    next_experiment_path = tmp_path / "next_experiment.json"
+    write_json(manifest_path, manifest.to_dict())
+    write_json(next_experiment_path, next_experiment.to_dict())
+    return (
+        ArtifactRef(
+            kind="run_manifest",
+            path=str(manifest_path),
+            sha256=sha256_file(manifest_path),
+            provenance={"producer": "pytest", "run_id": manifest.run_id},
+        ),
+        ArtifactRef(
+            kind="next_experiment_report",
+            path=str(next_experiment_path),
+            sha256=sha256_file(next_experiment_path),
+            provenance={
+                "producer": "pytest",
+                "run_id": next_experiment.run_id,
+                "gate_id": next_experiment.gate_id,
+                "derivation": "derive_next_experiment_report",
+            },
+        ),
+    )
+
+
 def _historical_baseline_seed(
     *,
     run_id: str,
@@ -344,6 +381,276 @@ def test_next_experiment_report_round_trips_strictly() -> None:
     )
 
     assert NextExperimentReport.from_dict(report.to_dict()) == report
+
+
+def test_next_experiment_plan_derives_executable_offline_candidates(tmp_path: Path) -> None:
+    score = _score_report()
+    manifest = _manifest_with_runtime_env(
+        score,
+        {
+            "AIC_LEWM_FINAL_SERVO_ENABLED": "1",
+            "AIC_LEWM_SFP_FINAL_SERVO_LINEAR": "0.02,0,0",
+            "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_MODE": "delta",
+            "AIC_LEWM_FINAL_SERVO_FORCE_GUARD_N": "21",
+        },
+    )
+    next_experiment = derive_next_experiment_report(
+        manifest,
+        reward_report=_reward_report(total=score.total),
+        failure_report=_failure_report(),
+        promotion=_promotion_decision(value=score.total, baseline_value=score.total - 0.2),
+        gate_id="gate_2_perception_servo",
+        generated_at_utc="2026-04-23T00:00:00Z",
+    )
+    manifest_artifact, next_experiment_artifact = _write_source_artifacts(
+        tmp_path,
+        manifest=manifest,
+        next_experiment=next_experiment,
+    )
+
+    plan = derive_next_experiment_plan(
+        next_experiment,
+        manifest=manifest,
+        source_next_experiment=next_experiment_artifact,
+        source_manifest=manifest_artifact,
+        generated_at_utc="2026-04-23T00:00:01Z",
+    )
+
+    assert NextExperimentPlan.from_dict(plan.to_dict()) == plan
+    assert plan.generated_at_utc == "2026-04-23T00:00:01Z"
+    candidates_by_id = {candidate.candidate_id: candidate for candidate in plan.candidates}
+    assert candidates_by_id["reject_fixed_lateral_bias_push"].status is NextExperimentPlanStatus.no_launch
+    assert candidates_by_id["reject_fixed_lateral_bias_push"].experiment is None
+    assert candidates_by_id["build_adaptive_final_centimeter_primitive"].status is (
+        NextExperimentPlanStatus.requires_implementation
+    )
+    assert candidates_by_id["build_adaptive_final_centimeter_primitive"].experiment is None
+    gate_plan = candidates_by_id["add_offline_final_centimeter_acceptance_gate"]
+    assert gate_plan.status is NextExperimentPlanStatus.launchable
+    assert gate_plan.execution_mode is NextExperimentExecutionMode.offline_gate
+    assert gate_plan.launchable is True
+    assert gate_plan.autonomous_launch_allowed is False
+    assert gate_plan.experiment is not None
+    assert gate_plan.experiment.backend.runtime_allowed is False
+    assert gate_plan.experiment.backend.config["candidate_id"] == gate_plan.candidate_id
+    assert gate_plan.experiment.expected_artifacts[0].kind == "offline_acceptance_gate_report"
+
+
+def test_next_experiment_plan_rejects_unbound_sources_and_duplicates(tmp_path: Path) -> None:
+    score = _score_report()
+    manifest = _manifest(score)
+    next_experiment = derive_next_experiment_report(
+        manifest,
+        reward_report=RewardReport(
+            run_id="gate2-candidate",
+            generated_at_utc="2026-04-23T00:00:00Z",
+            terms=(
+                RewardTerm(
+                    name="official.score.total",
+                    value=score.total,
+                    signal_kind=RewardSignalKind.official_score,
+                    leakage_class=LeakageClass.privileged_eval_signal,
+                    source=score.source,
+                ),
+            ),
+        ),
+        failure_report=FailureReport(
+            run_id="gate2-candidate",
+            generated_at_utc="2026-04-23T00:00:00Z",
+            labels=(
+                FailureLabel(
+                    kind=FailureKind.no_partial_or_full_insertion,
+                    severity=FailureSeverity.blocker,
+                    summary="Tier 3 evidence is proximity-only.",
+                    source=score.source,
+                    leakage_class=LeakageClass.privileged_eval_signal,
+                    evidence={"max_tier_3": 25.0},
+                ),
+            ),
+        ),
+        gate_id="gate_2_perception_servo",
+    )
+    manifest_artifact, next_experiment_artifact = _write_source_artifacts(
+        tmp_path,
+        manifest=manifest,
+        next_experiment=next_experiment,
+    )
+    uri_only_next_experiment = ArtifactRef(
+        kind="next_experiment_report",
+        uri="memory://pytest/next_experiment.json",
+        sha256=next_experiment_artifact.sha256,
+        provenance={
+            "producer": "pytest",
+            "run_id": next_experiment.run_id,
+            "gate_id": next_experiment.gate_id,
+            "derivation": "derive_next_experiment_report",
+        },
+    )
+    with pytest.raises(HarnessIOError, match="local byte-verifiable"):
+        derive_next_experiment_plan(
+            next_experiment,
+            manifest=manifest,
+            source_next_experiment=uri_only_next_experiment,
+            source_manifest=manifest_artifact,
+        )
+
+    plan = derive_next_experiment_plan(
+        next_experiment,
+        manifest=manifest,
+        source_next_experiment=next_experiment_artifact,
+        source_manifest=manifest_artifact,
+    )
+    payload = plan.to_dict()
+    payload["candidates"].append(dict(payload["candidates"][0]))
+    with pytest.raises(HarnessIOError, match="duplicate plan_id"):
+        NextExperimentPlan.from_dict(payload)
+
+    launch_payload = plan.to_dict()
+    launch_payload["candidates"][0]["autonomous_launch_allowed"] = True
+    with pytest.raises(HarnessIOError, match="autonomous_launch_allowed"):
+        NextExperimentPlan.from_dict(launch_payload)
+
+    blocked_payload = plan.to_dict()
+    launchable_experiment = next(
+        candidate.experiment for candidate in plan.candidates if candidate.experiment is not None
+    )
+    blocked_payload["candidates"][0] = {
+        **blocked_payload["candidates"][0],
+        "status": "blocked",
+        "blocked_by_labels": ["inconclusive_missing_evidence"],
+        "experiment": launchable_experiment.to_dict(),
+        "launchable": False,
+    }
+    with pytest.raises(HarnessIOError, match="blocked.*must not include experiment"):
+        NextExperimentPlan.from_dict(blocked_payload)
+
+
+def test_next_experiment_plan_rejects_source_content_mismatch(tmp_path: Path) -> None:
+    score = _score_report()
+    manifest = _manifest(score)
+    next_experiment = derive_next_experiment_report(
+        manifest,
+        reward_report=RewardReport(
+            run_id="gate2-candidate",
+            generated_at_utc="2026-04-23T00:00:00Z",
+            terms=(
+                RewardTerm(
+                    name="official.score.total",
+                    value=score.total,
+                    signal_kind=RewardSignalKind.official_score,
+                    leakage_class=LeakageClass.privileged_eval_signal,
+                    source=score.source,
+                ),
+            ),
+        ),
+        failure_report=FailureReport(
+            run_id="gate2-candidate",
+            generated_at_utc="2026-04-23T00:00:00Z",
+            labels=(
+                FailureLabel(
+                    kind=FailureKind.no_partial_or_full_insertion,
+                    severity=FailureSeverity.blocker,
+                    summary="Tier 3 evidence is proximity-only.",
+                    source=score.source,
+                    leakage_class=LeakageClass.privileged_eval_signal,
+                    evidence={"max_tier_3": 25.0},
+                ),
+            ),
+        ),
+        gate_id="gate_2_perception_servo",
+    )
+    manifest_artifact, next_experiment_artifact = _write_source_artifacts(
+        tmp_path,
+        manifest=manifest,
+        next_experiment=next_experiment,
+    )
+    contradictory_report = NextExperimentReport(
+        run_id=next_experiment.run_id,
+        gate_id=next_experiment.gate_id,
+        generated_at_utc=next_experiment.generated_at_utc,
+        decision=next_experiment.decision,
+        objective=next_experiment.objective,
+        candidates=tuple(reversed(next_experiment.candidates)),
+        notes=next_experiment.notes,
+    )
+    with pytest.raises(HarnessIOError, match="does not match supplied next_experiment"):
+        derive_next_experiment_plan(
+            contradictory_report,
+            manifest=manifest,
+            source_next_experiment=next_experiment_artifact,
+            source_manifest=manifest_artifact,
+        )
+
+    original_plan = derive_next_experiment_plan(
+        next_experiment,
+        manifest=manifest,
+        source_next_experiment=next_experiment_artifact,
+        source_manifest=manifest_artifact,
+    )
+    first_candidate = next_experiment.candidates[0]
+    retitled_candidate = NextExperimentCandidate(
+        candidate_id=first_candidate.candidate_id,
+        kind=first_candidate.kind,
+        priority=first_candidate.priority,
+        action=first_candidate.action,
+        title=first_candidate.title + " v2",
+        rationale=first_candidate.rationale,
+        evidence_labels=first_candidate.evidence_labels,
+        evidence_terms=first_candidate.evidence_terms,
+        evidence_manifest_fields=first_candidate.evidence_manifest_fields,
+        acceptance_checks=first_candidate.acceptance_checks,
+        blocked_by_labels=first_candidate.blocked_by_labels,
+        runtime_notes=first_candidate.runtime_notes,
+        leakage_notes=first_candidate.leakage_notes,
+    )
+    retitled_report = NextExperimentReport(
+        run_id=next_experiment.run_id,
+        gate_id=next_experiment.gate_id,
+        generated_at_utc=next_experiment.generated_at_utc,
+        decision=next_experiment.decision,
+        objective=next_experiment.objective,
+        candidates=(retitled_candidate, *next_experiment.candidates[1:]),
+        notes=next_experiment.notes,
+    )
+    retitled_manifest_artifact, retitled_next_artifact = _write_source_artifacts(
+        tmp_path / "retitled",
+        manifest=manifest,
+        next_experiment=retitled_report,
+    )
+    retitled_plan = derive_next_experiment_plan(
+        retitled_report,
+        manifest=manifest,
+        source_next_experiment=retitled_next_artifact,
+        source_manifest=retitled_manifest_artifact,
+    )
+    assert original_plan.candidates[0].candidate_id == retitled_plan.candidates[0].candidate_id
+    assert original_plan.candidates[0].plan_id != retitled_plan.candidates[0].plan_id
+
+    manifest_variant = RunManifest(
+        run_id=manifest.run_id,
+        status=manifest.status,
+        backend=manifest.backend,
+        created_at_utc=manifest.created_at_utc,
+        updated_at_utc=manifest.updated_at_utc,
+        artifacts=manifest.artifacts,
+        score=manifest.score,
+        experiment_id=manifest.experiment_id,
+        hypothesis="Same recommendation against a changed manifest.",
+        notes=manifest.notes,
+    )
+    variant_manifest_artifact, variant_next_artifact = _write_source_artifacts(
+        tmp_path / "manifest_variant",
+        manifest=manifest_variant,
+        next_experiment=next_experiment,
+    )
+    variant_plan = derive_next_experiment_plan(
+        next_experiment,
+        manifest=manifest_variant,
+        source_next_experiment=variant_next_artifact,
+        source_manifest=variant_manifest_artifact,
+    )
+    assert original_plan.candidates[0].candidate_id == variant_plan.candidates[0].candidate_id
+    assert original_plan.candidates[0].plan_id != variant_plan.candidates[0].plan_id
 
 
 def test_next_experiment_report_rejects_unknown_nested_fields() -> None:

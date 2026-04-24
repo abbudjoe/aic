@@ -17,6 +17,7 @@ from aic_signal_harness.reducers.mcap_eval import (
     reduce_mcap_eval_bundle,
 )
 from aic_signal_harness.reducers.next_experiment import derive_next_experiment_report
+from aic_signal_harness.reducers.next_experiment_plan import derive_next_experiment_plan
 from aic_signal_harness.reducers.policy_trace import (
     PolicyTraceReduction,
     analyze_policy_trace_jsonl,
@@ -47,6 +48,7 @@ __all__ = [
     "build_ledger_entry",
     "derive_episode_trace",
     "derive_next_experiment_report",
+    "derive_next_experiment_plan",
     "derive_reward_failure_reports",
     "derive_training_signal_report",
     "promote_ledger_entry",

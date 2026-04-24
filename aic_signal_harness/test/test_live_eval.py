@@ -151,6 +151,7 @@ def test_finalize_live_eval_run_writes_neutral_harness_artifacts(tmp_path: Path)
         harness_root / "reward_report.json",
         harness_root / "failure_report.json",
         harness_root / "next_experiment.json",
+        harness_root / "next_experiment_plan.json",
         harness_root / "ledger_entry.json",
         harness_root / "live_eval_summary.json",
         baseline_path,
@@ -200,8 +201,14 @@ def test_finalize_live_eval_run_writes_neutral_harness_artifacts(tmp_path: Path)
     }
     assert all(signal["offline_only"] is True for signal in training_signals["signals"])
     assert all(signal["runtime_allowed"] is False for signal in training_signals["signals"])
+    next_plan = read_json(harness_root / "next_experiment_plan.json")
+    assert next_plan["source_next_experiment"]["kind"] == "next_experiment_report"
+    assert next_plan["source_manifest"]["kind"] == "run_manifest"
+    assert all(candidate["offline_only"] is True for candidate in next_plan["candidates"])
+    assert all(candidate["autonomous_launch_allowed"] is False for candidate in next_plan["candidates"])
     summary = read_json(harness_root / "live_eval_summary.json")
     assert summary["next_experiment_path"] == str(harness_root / "next_experiment.json")
+    assert summary["next_experiment_plan_path"] == str(harness_root / "next_experiment_plan.json")
     assert summary["episode_trace_path"] == str(harness_root / "episode_trace.json")
     assert summary["training_signal_report_path"] == str(
         harness_root / "training_signal_report.json"

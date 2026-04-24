@@ -46,6 +46,12 @@ from aic_signal_harness.next_experiment import (
     NextExperimentPriority,
     NextExperimentReport,
 )
+from aic_signal_harness.next_experiment_plan import (
+    NextExperimentExecutionMode,
+    NextExperimentPlan,
+    NextExperimentPlanCandidate,
+    NextExperimentPlanStatus,
+)
 from aic_signal_harness.policy_trace import (
     PolicyTraceEvent,
     PolicyTraceEventType,
@@ -80,6 +86,7 @@ from aic_signal_harness.reducers import (
     build_ledger_entry,
     derive_episode_trace,
     derive_next_experiment_report,
+    derive_next_experiment_plan,
     derive_reward_failure_reports,
     derive_training_signal_report,
     promote_ledger_entry,
@@ -143,6 +150,10 @@ __all__ = [
     "NextExperimentCandidateKind",
     "NextExperimentDecision",
     "NextExperimentPriority",
+    "NextExperimentExecutionMode",
+    "NextExperimentPlan",
+    "NextExperimentPlanCandidate",
+    "NextExperimentPlanStatus",
     "NextExperimentReport",
     "PER_STEP_HDF5_DATASET_KEYS",
     "PolicyBackendSpec",
@@ -184,6 +195,7 @@ __all__ = [
     "build_ledger_entry",
     "derive_episode_trace",
     "derive_next_experiment_report",
+    "derive_next_experiment_plan",
     "derive_reward_failure_reports",
     "derive_training_signal_report",
     "experiment_spec_from_json",
