@@ -172,6 +172,10 @@ def derive_training_signal_report(
     *,
     episode_trace: EpisodeTrace | Mapping[str, Any],
     source_trace: ArtifactRef,
+    reward_report: RewardReport | Mapping[str, Any] | None = None,
+    failure_report: FailureReport | Mapping[str, Any] | None = None,
+    source_reward_report: ArtifactRef | None = None,
+    source_failure_report: ArtifactRef | None = None,
     generated_at_utc: str | None = None,
 ) -> TrainingSignalReport:
     """Extract deterministic training signals from a canonical episode trace."""
@@ -182,27 +186,43 @@ def derive_training_signal_report(
         else EpisodeTrace.from_dict(episode_trace)
     )
     _validate_source_trace(source_trace, trace)
+    typed_reward = _optional_reward_report(reward_report)
+    typed_failure = _optional_failure_report(failure_report)
+    _validate_training_report_inputs(
+        trace=trace,
+        reward_report=typed_reward,
+        failure_report=typed_failure,
+        source_reward_report=source_reward_report,
+        source_failure_report=source_failure_report,
+    )
     generated_at = trace.generated_at_utc if generated_at_utc is None else generated_at_utc
     signals: list[TrainingSignal] = []
     for trial in trace.trials:
+        latest_observation: TimelineEvent | None = None
         for event in trial.events:
-            if event.event_kind is TimelineEventKind.action_event and _action_event_is_nonzero(event):
-                signals.append(_behavior_clone_signal(event))
+            if event.event_kind is TimelineEventKind.observation_event:
+                latest_observation = event
+            elif event.event_kind is TimelineEventKind.action_event and _action_event_is_nonzero(event):
+                signals.append(_behavior_clone_signal(trace.run_id, event, latest_observation))
             elif event.event_kind is TimelineEventKind.safety_guard:
-                signals.append(_safety_signal(event))
+                signals.append(_safety_signal(trace.run_id, event))
     for event in trace.run_events:
-        if event.event_kind is TimelineEventKind.official_score:
-            signals.append(_official_score_signal(event))
+        if event.event_kind is TimelineEventKind.dataset_episode_summary:
+            signals.append(_dataset_signal(trace.run_id, event))
+        elif event.event_kind is TimelineEventKind.official_score:
+            signals.append(_official_score_signal(trace.run_id, event))
         elif event.event_kind is TimelineEventKind.reward_term:
-            reward_signal = _reward_signal(event)
+            reward_signal = _reward_signal(trace.run_id, event)
             if reward_signal is not None:
                 signals.append(reward_signal)
         elif event.event_kind is TimelineEventKind.failure_label:
-            signals.append(_failure_signal(event))
+            signals.append(_failure_signal(trace.run_id, event))
     return TrainingSignalReport(
         run_id=trace.run_id,
         generated_at_utc=generated_at,
         source_trace=source_trace,
+        source_reward_report=source_reward_report,
+        source_failure_report=source_failure_report,
         signals=tuple(signals),
         notes=(
             "Signals are offline-only extraction records and must not enter the live policy runtime.",
@@ -796,32 +816,66 @@ def _action_event_is_nonzero(event: TimelineEvent) -> bool:
     return isinstance(payload, Mapping) and action_payload_is_nonzero(payload)
 
 
-def _behavior_clone_signal(event: TimelineEvent) -> TrainingSignal:
+def _behavior_clone_signal(
+    run_id: str,
+    event: TimelineEvent,
+    observation_event: TimelineEvent | None,
+) -> TrainingSignal:
     if event.leakage_class is not LeakageClass.legal_policy_action_output:
         raise HarnessIOError(
             "behavior-clone action signals require legal_policy_action_output action events"
         )
+    source_event_indices = (
+        (observation_event.event_index, event.event_index)
+        if observation_event is not None
+        else (event.event_index,)
+    )
+    evidence: dict[str, Any] = {
+        "event_index": event.event_index,
+        "elapsed_sec": event.elapsed_sec,
+        "action": event.payload.get("policy_payload", {}),
+    }
+    if observation_event is not None:
+        evidence["observation_event_index"] = observation_event.event_index
+        evidence["observation_elapsed_sec"] = observation_event.elapsed_sec
     return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.behavior_clone_action,
+            "policy.action",
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
         kind=TrainingSignalKind.behavior_clone_action,
         target="policy.action",
         weight=1.0,
         source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.behavior_clone_action",
         leakage_class=event.leakage_class,
         trial_id=event.trial_id,
-        evidence={
-            "event_index": event.event_index,
-            "elapsed_sec": event.elapsed_sec,
-            "action": event.payload.get("policy_payload", {}),
-        },
+        evidence=evidence,
     )
 
 
-def _safety_signal(event: TimelineEvent) -> TrainingSignal:
+def _safety_signal(run_id: str, event: TimelineEvent) -> TrainingSignal:
+    source_event_indices = (event.event_index,)
     return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.safety_guard_avoidance,
+            "policy.safety_guard",
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
         kind=TrainingSignalKind.safety_guard_avoidance,
         target="policy.safety_guard",
         weight=1.0,
         source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.safety_guard_avoidance",
         leakage_class=event.leakage_class,
         trial_id=event.trial_id,
         evidence={
@@ -832,42 +886,100 @@ def _safety_signal(event: TimelineEvent) -> TrainingSignal:
     )
 
 
-def _official_score_signal(event: TimelineEvent) -> TrainingSignal:
+def _dataset_signal(run_id: str, event: TimelineEvent) -> TrainingSignal:
+    source_event_indices = (event.event_index,)
     return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.dataset_episode_summary,
+            "training.dataset",
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
+        kind=TrainingSignalKind.dataset_episode_summary,
+        target="training.dataset",
+        weight=1.0 if event.payload.get("ok") is True else 0.0,
+        source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.dataset_episode_summary",
+        leakage_class=event.leakage_class,
+        trial_id=event.trial_id,
+        evidence={**event.payload, "event_index": event.event_index},
+    )
+
+
+def _official_score_signal(run_id: str, event: TimelineEvent) -> TrainingSignal:
+    source_event_indices = (event.event_index,)
+    return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.official_score_term,
+            "evaluation.score.total",
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
         kind=TrainingSignalKind.official_score_term,
         target="evaluation.score.total",
         weight=1.0,
         source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.official_score_term",
         leakage_class=event.leakage_class,
-        evidence=event.payload,
+        evidence={**event.payload, "event_index": event.event_index},
     )
 
 
-def _reward_signal(event: TimelineEvent) -> TrainingSignal | None:
+def _reward_signal(run_id: str, event: TimelineEvent) -> TrainingSignal | None:
     if event.payload.get("signal_kind") == RewardSignalKind.official_score.value:
         return None
+    target = str(event.payload.get("name", "reward.term"))
+    source_event_indices = (event.event_index,)
     return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.reward_term,
+            target,
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
         kind=TrainingSignalKind.reward_term,
-        target=str(event.payload.get("name", "reward.term")),
+        target=target,
         weight=1.0,
         source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.reward_term",
         leakage_class=event.leakage_class,
         trial_id=event.trial_id,
-        evidence=event.payload,
+        evidence={**event.payload, "event_index": event.event_index},
     )
 
 
-def _failure_signal(event: TimelineEvent) -> TrainingSignal:
+def _failure_signal(run_id: str, event: TimelineEvent) -> TrainingSignal:
     payload = event.payload
     severity = payload.get("severity")
+    target = str(payload.get("kind", "failure.label"))
+    source_event_indices = (event.event_index,)
     return TrainingSignal(
+        signal_id=_training_signal_id(
+            run_id,
+            TrainingSignalKind.failure_label,
+            target,
+            source_event_indices,
+            event.trial_id,
+            event.source,
+        ),
         kind=TrainingSignalKind.failure_label,
-        target=str(payload.get("kind", "failure.label")),
+        target=target,
         weight=_failure_weight(severity),
         source=event.source,
+        source_event_indices=source_event_indices,
+        extraction_method="episode_trace.v1.failure_label",
         leakage_class=event.leakage_class,
         trial_id=event.trial_id,
-        evidence=payload,
+        evidence={**payload, "event_index": event.event_index},
     )
 
 
@@ -877,6 +989,170 @@ def _failure_weight(severity: Any) -> float:
     if severity == FailureSeverity.warning.value:
         return 0.5
     return 0.25
+
+
+def _training_signal_id(
+    run_id: str,
+    kind: TrainingSignalKind,
+    target: str,
+    source_event_indices: tuple[int, ...],
+    trial_id: str | None,
+    source: str,
+) -> str:
+    payload = {
+        "run_id": run_id,
+        "kind": kind.value,
+        "target": target,
+        "source_event_indices": list(source_event_indices),
+        "trial_id": trial_id,
+        "source": source,
+    }
+    encoded = json.dumps(payload, allow_nan=False, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return "tsig_" + hashlib.sha256(encoded).hexdigest()[:20]
+
+
+def _validate_training_report_inputs(
+    *,
+    trace: EpisodeTrace,
+    reward_report: RewardReport | None,
+    failure_report: FailureReport | None,
+    source_reward_report: ArtifactRef | None,
+    source_failure_report: ArtifactRef | None,
+) -> None:
+    reward_events = tuple(
+        event for event in trace.run_events if event.event_kind is TimelineEventKind.reward_term
+    )
+    failure_events = tuple(
+        event for event in trace.run_events if event.event_kind is TimelineEventKind.failure_label
+    )
+    if reward_events:
+        if reward_report is None:
+            raise HarnessIOError("reward_report is required when episode trace has reward_term events")
+        if source_reward_report is None:
+            raise HarnessIOError(
+                "source_reward_report is required when episode trace has reward_term events"
+            )
+        _validate_source_report_artifact(
+            source_report=source_reward_report,
+            report=reward_report,
+            expected_kind="reward_report",
+            field_name="source_reward_report",
+        )
+        _validate_reward_report_matches_trace(reward_report, reward_events)
+    elif reward_report is not None or source_reward_report is not None:
+        raise HarnessIOError("reward_report inputs require episode trace reward_term events")
+
+    if failure_events:
+        if failure_report is None:
+            raise HarnessIOError("failure_report is required when episode trace has failure_label events")
+        if source_failure_report is None:
+            raise HarnessIOError(
+                "source_failure_report is required when episode trace has failure_label events"
+            )
+        _validate_source_report_artifact(
+            source_report=source_failure_report,
+            report=failure_report,
+            expected_kind="failure_report",
+            field_name="source_failure_report",
+        )
+        _validate_failure_report_matches_trace(failure_report, failure_events)
+    elif failure_report is not None or source_failure_report is not None:
+        raise HarnessIOError("failure_report inputs require episode trace failure_label events")
+
+
+def _validate_source_report_artifact(
+    *,
+    source_report: ArtifactRef,
+    report: RewardReport | FailureReport,
+    expected_kind: str,
+    field_name: str,
+) -> None:
+    errors: list[str] = []
+    if source_report.kind != expected_kind:
+        errors.append(f"{field_name}.kind must be {expected_kind!r}")
+    if source_report.provenance.get("run_id") != report.run_id:
+        errors.append(f"{field_name} provenance run_id must match report.run_id")
+    if "producer" not in source_report.provenance:
+        errors.append(f"{field_name} provenance must include producer")
+    if "derivation" not in source_report.provenance:
+        errors.append(f"{field_name} provenance must include derivation")
+    expected_sha256 = _report_sha256(report.to_dict())
+    if source_report.sha256 != expected_sha256:
+        errors.append(f"{field_name}.sha256 must match supplied {expected_kind}")
+    try:
+        report_path = local_artifact_path(
+            path=source_report.path,
+            uri=source_report.uri,
+            field_name=field_name,
+        )
+    except HarnessIOError as exc:
+        errors.append(str(exc))
+        report_path = None
+    if report_path is not None:
+        if not report_path.exists():
+            errors.append(f"{field_name}.path must exist when set")
+        elif not report_path.is_file():
+            errors.append(f"{field_name}.path must point to a JSON report file")
+        else:
+            if sha256_file(report_path) != source_report.sha256:
+                errors.append(f"{field_name}.sha256 must match {field_name}.path")
+            try:
+                payload = read_json(report_path)
+                parsed_report = (
+                    RewardReport.from_dict(payload)
+                    if expected_kind == "reward_report"
+                    else FailureReport.from_dict(payload)
+                )
+                if parsed_report != report:
+                    errors.append(f"{field_name}.path does not match supplied {expected_kind}")
+            except HarnessIOError as exc:
+                errors.append(str(exc))
+    else:
+        errors.append(f"{field_name} must be a local byte-verifiable report artifact")
+    if errors:
+        raise HarnessIOError("; ".join(errors))
+
+
+def _validate_reward_report_matches_trace(
+    reward_report: RewardReport,
+    reward_events: tuple[TimelineEvent, ...],
+) -> None:
+    if len(reward_report.terms) != len(reward_events):
+        raise HarnessIOError("reward_report terms must match episode trace reward_term events")
+    details: list[str] = []
+    for index, (term, event) in enumerate(zip(reward_report.terms, reward_events, strict=True)):
+        if _post_hoc_label_payload(term.to_dict(), event.payload) != term.to_dict():
+            details.append(f"reward term {index}")
+    if details:
+        raise HarnessIOError(
+            "reward_report terms must match episode trace reward_term events: " + ", ".join(details)
+        )
+
+
+def _validate_failure_report_matches_trace(
+    failure_report: FailureReport,
+    failure_events: tuple[TimelineEvent, ...],
+) -> None:
+    if len(failure_report.labels) != len(failure_events):
+        raise HarnessIOError("failure_report labels must match episode trace failure_label events")
+    details: list[str] = []
+    for index, (label, event) in enumerate(zip(failure_report.labels, failure_events, strict=True)):
+        if _post_hoc_label_payload(label.to_dict(), event.payload) != label.to_dict():
+            details.append(f"failure label {index}")
+    if details:
+        raise HarnessIOError(
+            "failure_report labels must match episode trace failure_label events: " + ", ".join(details)
+        )
+
+
+def _post_hoc_label_payload(
+    expected_payload: Mapping[str, Any],
+    event_payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    ignored = {"event_scope", "evidence_window", "source_trial_id", "event_index"}
+    return {key: value for key, value in event_payload.items() if key not in ignored or key in expected_payload}
 
 
 def _optional_score_report(value: ScoreReport | Mapping[str, Any] | None) -> ScoreReport | None:

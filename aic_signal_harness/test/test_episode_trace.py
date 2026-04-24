@@ -506,11 +506,21 @@ def _typed_report_artifact(kind: str, report: Any) -> ArtifactRef:
     report_root = Path(tempfile.gettempdir()) / "aic_signal_harness_episode_trace_reports"
     report_path = report_root / f"{kind}-{report_digest}.json"
     write_json(report_path, report_payload, overwrite=True)
+    derivation_by_kind = {
+        "reward_report": "derive_reward_failure_reports",
+        "failure_report": "derive_reward_failure_reports",
+        "hdf5_dataset_report": "reduce_hdf5_dataset",
+        "mcap_eval_report": "reduce_mcap_eval_bundle",
+    }
     return ArtifactRef(
         kind=kind,
         path=str(report_path),
         sha256=sha256_file(report_path),
-        provenance={"producer": "pytest", "run_id": "run-a"},
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "derivation": derivation_by_kind.get(kind, f"derive_{kind}"),
+        },
     )
 
 
@@ -665,6 +675,20 @@ def _source_trace_ref(
     )
 
 
+def _training_signal_source_reports(
+    reward_report: RewardReport | None = None,
+    failure_report: FailureReport | None = None,
+) -> tuple[RewardReport, FailureReport, ArtifactRef, ArtifactRef]:
+    typed_reward = _reward_report() if reward_report is None else reward_report
+    typed_failure = _failure_report() if failure_report is None else failure_report
+    return (
+        typed_reward,
+        typed_failure,
+        _typed_report_artifact("reward_report", typed_reward),
+        _typed_report_artifact("failure_report", typed_failure),
+    )
+
+
 def _reindex_episode_payload(payload: dict[str, Any]) -> None:
     ordered_events = [
         event
@@ -676,13 +700,14 @@ def _reindex_episode_payload(payload: dict[str, Any]) -> None:
 
 
 def test_episode_trace_round_trip_and_training_signals() -> None:
+    reward_report, failure_report, reward_artifact, failure_artifact = _training_signal_source_reports()
     trace = derive_episode_trace(
         run_id="run-a",
         policy_events=_policy_events(),
         source_artifacts=_source_artifacts(include_reports=True),
         score_report=_score_report(),
-        reward_report=_reward_report(),
-        failure_report=_failure_report(),
+        reward_report=reward_report,
+        failure_report=failure_report,
         generated_at_utc="2026-04-24T00:00:05Z",
     )
 
@@ -700,10 +725,15 @@ def test_episode_trace_round_trip_and_training_signals() -> None:
     report = derive_training_signal_report(
         episode_trace=trace,
         source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
         generated_at_utc="2026-04-24T00:00:06Z",
     )
 
     assert TrainingSignalReport.from_dict(report.to_dict()) == report
+    assert report.schema_version == 2
     assert {signal.kind for signal in report.signals} == {
         TrainingSignalKind.behavior_clone_action,
         TrainingSignalKind.safety_guard_avoidance,
@@ -712,13 +742,22 @@ def test_episode_trace_round_trip_and_training_signals() -> None:
         TrainingSignalKind.failure_label,
     }
     assert report.generated_at_utc == "2026-04-24T00:00:06Z"
+    assert report.source_reward_report == reward_artifact
+    assert report.source_failure_report == failure_artifact
+    assert len({signal.signal_id for signal in report.signals}) == len(report.signals)
     for signal in report.signals:
         assert signal.offline_only is True
         assert signal.runtime_allowed is False
         assert signal.consumable_by_policy_runtime is False
+        assert signal.source_event_indices
+        assert signal.extraction_method.startswith("episode_trace.v1.")
     reward_signal = next(signal for signal in report.signals if signal.kind is TrainingSignalKind.reward_term)
     assert reward_signal.weight == 1.0
     assert reward_signal.evidence["value"] == 123.0
+    action_signal = next(
+        signal for signal in report.signals if signal.kind is TrainingSignalKind.behavior_clone_action
+    )
+    assert action_signal.source_event_indices == (1,)
     assert all(
         signal.kind is not TrainingSignalKind.reward_term
         or signal.evidence["signal_kind"] != "official_score"
@@ -756,18 +795,40 @@ def test_episode_trace_fuses_hdf5_and_observation_evidence() -> None:
     assert dataset_payload["step_count"] == 6
     assert dataset_payload["observation_datasets"]["pixels"]["shape"] == [6, 8, 8, 3]
     assert dataset_payload["action_datasets"]["action"]["shape"] == [6, 6]
+    report = derive_training_signal_report(
+        episode_trace=trace,
+        source_trace=_source_trace_ref(trace),
+    )
+    dataset_signal = next(
+        signal for signal in report.signals if signal.kind is TrainingSignalKind.dataset_episode_summary
+    )
+    assert dataset_signal.target == "training.dataset"
+    assert dataset_signal.source_event_indices == (dataset_event.event_index,)
+    action_signals = [
+        signal for signal in report.signals if signal.kind is TrainingSignalKind.behavior_clone_action
+    ]
+    assert all(len(signal.source_event_indices) == 2 for signal in action_signals)
 
 
 def test_training_signal_report_defaults_to_episode_trace_timestamp() -> None:
     trace = _episode_trace()
+    reward_report, failure_report, reward_artifact, failure_artifact = _training_signal_source_reports()
 
     first_report = derive_training_signal_report(
         episode_trace=trace,
         source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
     )
     second_report = derive_training_signal_report(
         episode_trace=trace,
         source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
     )
 
     assert first_report == second_report
@@ -1683,10 +1744,13 @@ def test_training_signal_report_rejects_weak_source_trace_and_non_string_keys() 
         )
     with pytest.raises(HarnessIOError, match="keys must be nonempty strings"):
         TrainingSignal(
+            signal_id="tsig_bad_evidence",
             kind=TrainingSignalKind.failure_label,
             target="failure",
             weight=1.0,
             source="pytest",
+            source_event_indices=(1,),
+            extraction_method="episode_trace.v1.failure_label",
             leakage_class=LeakageClass.post_hoc_label,
             evidence=cast(Any, {1: "not-json-object-contract"}),
         )
@@ -1782,6 +1846,130 @@ def test_training_signal_report_binds_source_trace_digest_and_content(tmp_path: 
         )
 
 
+def test_training_signal_report_binds_reward_failure_source_reports() -> None:
+    trace = _episode_trace()
+    reward_report, failure_report, reward_artifact, failure_artifact = _training_signal_source_reports()
+
+    with pytest.raises(HarnessIOError, match="source_reward_report is required"):
+        derive_training_signal_report(
+            episode_trace=trace,
+            source_trace=_source_trace_ref(trace),
+            reward_report=reward_report,
+            failure_report=failure_report,
+            source_failure_report=failure_artifact,
+        )
+
+    forged_reward_artifact = ArtifactRef(
+        kind="reward_report",
+        uri="memory://pytest/reward_report.json",
+        sha256="0" * 64,
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "derivation": "derive_reward_failure_reports",
+        },
+    )
+    with pytest.raises(HarnessIOError, match="source_reward_report.sha256"):
+        derive_training_signal_report(
+            episode_trace=trace,
+            source_trace=_source_trace_ref(trace),
+            reward_report=reward_report,
+            failure_report=failure_report,
+            source_reward_report=forged_reward_artifact,
+            source_failure_report=failure_artifact,
+        )
+
+    uri_only_reward_artifact = ArtifactRef(
+        kind="reward_report",
+        uri="memory://pytest/reward_report.json",
+        sha256=_report_sha256(reward_report.to_dict()),
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "derivation": "derive_reward_failure_reports",
+        },
+    )
+    with pytest.raises(HarnessIOError, match="local byte-verifiable"):
+        derive_training_signal_report(
+            episode_trace=trace,
+            source_trace=_source_trace_ref(trace),
+            reward_report=reward_report,
+            failure_report=failure_report,
+            source_reward_report=uri_only_reward_artifact,
+            source_failure_report=failure_artifact,
+        )
+
+    contradictory_reward = RewardReport(
+        run_id="run-a",
+        generated_at_utc="2026-04-24T00:00:04Z",
+        terms=(
+            reward_report.terms[0],
+            RewardTerm(
+                name="diagnostic.margin",
+                value=999.0,
+                signal_kind=RewardSignalKind.diagnostic,
+                leakage_class=LeakageClass.privileged_eval_signal,
+                source=_SCORE_SOURCE,
+                trial_id="task_1__policy_call_0001",
+            ),
+        ),
+    )
+    with pytest.raises(HarnessIOError, match="reward_report terms must match"):
+        derive_training_signal_report(
+            episode_trace=trace,
+            source_trace=_source_trace_ref(trace),
+            reward_report=contradictory_reward,
+            failure_report=failure_report,
+            source_reward_report=_typed_report_artifact("reward_report", contradictory_reward),
+            source_failure_report=failure_artifact,
+        )
+
+    payload = derive_training_signal_report(
+        episode_trace=trace,
+        source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
+    ).to_dict()
+    payload["signals"].append(dict(payload["signals"][0]))
+    with pytest.raises(HarnessIOError, match="duplicate signal_id"):
+        TrainingSignalReport.from_dict(payload)
+
+    uri_only_payload = derive_training_signal_report(
+        episode_trace=trace,
+        source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
+    ).to_dict()
+    uri_only_payload["source_reward_report"] = ArtifactRef(
+        kind="reward_report",
+        uri="memory://pytest/reward_report.json",
+        sha256=_report_sha256(reward_report.to_dict()),
+        provenance={
+            "producer": "pytest",
+            "run_id": "run-a",
+            "derivation": "derive_reward_failure_reports",
+        },
+    ).to_dict()
+    with pytest.raises(HarnessIOError, match="local byte-verifiable"):
+        TrainingSignalReport.from_dict(uri_only_payload)
+
+    legacy_payload = derive_training_signal_report(
+        episode_trace=trace,
+        source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
+    ).to_dict()
+    legacy_payload["schema_version"] = 1
+    with pytest.raises(HarnessIOError, match="schema_version must be 2"):
+        TrainingSignalReport.from_dict(legacy_payload)
+
+
 def test_training_signals_preserve_trace_trial_ids_for_mapped_labels() -> None:
     reward_report = RewardReport(
         run_id="run-a",
@@ -1811,6 +1999,8 @@ def test_training_signals_preserve_trace_trial_ids_for_mapped_labels() -> None:
             ),
         ),
     )
+    reward_artifact = _typed_report_artifact("reward_report", reward_report)
+    failure_artifact = _typed_report_artifact("failure_report", failure_report)
     trace = derive_episode_trace(
         run_id="run-a",
         policy_events=_policy_events(),
@@ -1824,6 +2014,10 @@ def test_training_signals_preserve_trace_trial_ids_for_mapped_labels() -> None:
     report = derive_training_signal_report(
         episode_trace=trace,
         source_trace=_source_trace_ref(trace),
+        reward_report=reward_report,
+        failure_report=failure_report,
+        source_reward_report=reward_artifact,
+        source_failure_report=failure_artifact,
         generated_at_utc="2026-04-24T00:00:06Z",
     )
 
@@ -1839,10 +2033,13 @@ def test_training_signals_preserve_trace_trial_ids_for_mapped_labels() -> None:
 
 def test_training_signal_from_dict_requires_explicit_runtime_boundary_flags() -> None:
     payload = TrainingSignal(
+        signal_id="tsig_test_failure",
         kind=TrainingSignalKind.failure_label,
         target="failure",
         weight=1.0,
         source="pytest",
+        source_event_indices=(1,),
+        extraction_method="episode_trace.v1.failure_label",
         leakage_class=LeakageClass.post_hoc_label,
         evidence={"kind": "failure"},
     ).to_dict()
@@ -1851,11 +2048,19 @@ def test_training_signal_from_dict_requires_explicit_runtime_boundary_flags() ->
         "offline_only",
         "runtime_allowed",
         "consumable_by_policy_runtime",
+        "signal_id",
+        "source_event_indices",
+        "extraction_method",
     ):
         missing = dict(payload)
         del missing[field_name]
         with pytest.raises(HarnessIOError, match=field_name):
             TrainingSignal.from_dict(missing)
+
+    for bad_indices in ((2, 1), (1, 1)):
+        malformed = {**payload, "source_event_indices": list(bad_indices)}
+        with pytest.raises(HarnessIOError, match="source_event_indices"):
+            TrainingSignal.from_dict(malformed)
 
 
 def test_training_signal_report_rejects_privileged_action_signal_extraction() -> None:
@@ -1896,8 +2101,13 @@ def test_training_signal_report_rejects_privileged_action_signal_extraction() ->
         trials=(mutated_trial,),
         run_events=trace.run_events,
     )
+    reward_report, failure_report, reward_artifact, failure_artifact = _training_signal_source_reports()
     with pytest.raises(HarnessIOError, match="legal_policy_action_output"):
         derive_training_signal_report(
             episode_trace=privileged_trace,
             source_trace=_source_trace_ref(privileged_trace),
+            reward_report=reward_report,
+            failure_report=failure_report,
+            source_reward_report=reward_artifact,
+            source_failure_report=failure_artifact,
         )

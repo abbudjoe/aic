@@ -477,6 +477,10 @@ def finalize_live_eval_run(
         training_signal_report = derive_training_signal_report(
             episode_trace=episode_trace,
             source_trace=episode_trace_artifact,
+            reward_report=reward_failure.reward_report,
+            failure_report=reward_failure.failure_report,
+            source_reward_report=reward_report_artifact,
+            source_failure_report=failure_report_artifact,
             generated_at_utc=generated_at,
         )
         write_json(
