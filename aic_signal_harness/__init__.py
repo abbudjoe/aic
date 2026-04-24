@@ -88,6 +88,7 @@ from aic_signal_harness.reducers import (
     derive_next_experiment_report,
     derive_next_experiment_plan,
     derive_reward_failure_reports,
+    derive_training_dataset_report,
     derive_training_signal_report,
     promote_ledger_entry,
     read_policy_trace_events,
@@ -118,6 +119,14 @@ from aic_signal_harness.training_signal import (
     TrainingSignal,
     TrainingSignalKind,
     TrainingSignalReport,
+)
+from aic_signal_harness.training_dataset import (
+    TrainingDatasetExample,
+    TrainingDatasetReport,
+    TrainingDatasetSplit,
+    training_dataset_example_id,
+    training_dataset_fingerprint_sha256,
+    training_signal_to_dataset_example,
 )
 
 __all__ = [
@@ -185,6 +194,9 @@ __all__ = [
     "TrainingSignal",
     "TrainingSignalKind",
     "TrainingSignalReport",
+    "TrainingDatasetExample",
+    "TrainingDatasetReport",
+    "TrainingDatasetSplit",
     "TrialScore",
     "TrialTrace",
     "analyze_mcap_eval_bundle",
@@ -197,6 +209,7 @@ __all__ = [
     "derive_next_experiment_report",
     "derive_next_experiment_plan",
     "derive_reward_failure_reports",
+    "derive_training_dataset_report",
     "derive_training_signal_report",
     "experiment_spec_from_json",
     "experiment_spec_to_json",
@@ -212,6 +225,9 @@ __all__ = [
     "reduce_hdf5_dataset",
     "reduce_scoring_yaml",
     "sha256_file",
+    "training_dataset_example_id",
+    "training_dataset_fingerprint_sha256",
+    "training_signal_to_dataset_example",
     "utc_now_iso",
     "validate_hdf5_dataset",
     "write_baseline_decision",

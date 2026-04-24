@@ -47,6 +47,16 @@ _TRAINING_SIGNAL_REPORT_KEYS = frozenset(
         "notes",
     }
 )
+_REQUIRED_TRAINING_SIGNAL_REPORT_KEYS = frozenset(
+    {
+        "schema_version",
+        "run_id",
+        "generated_at_utc",
+        "source_trace",
+        "signals",
+        "notes",
+    }
+)
 
 
 class _StrEnum(str, Enum):
@@ -363,6 +373,7 @@ class TrainingSignalReport:
         if not isinstance(value, Mapping):
             raise HarnessIOError("training signal report must be a mapping")
         _reject_unknown_keys(value, _TRAINING_SIGNAL_REPORT_KEYS, "training signal report")
+        _require_keys(value, _REQUIRED_TRAINING_SIGNAL_REPORT_KEYS, "training signal report")
         return cls(
             schema_version=cast(Any, value.get("schema_version")),
             run_id=cast(Any, value.get("run_id")),
@@ -370,8 +381,8 @@ class TrainingSignalReport:
             source_trace=cast(Any, value.get("source_trace")),
             source_reward_report=cast(Any, value.get("source_reward_report")),
             source_failure_report=cast(Any, value.get("source_failure_report")),
-            signals=cast(Any, value.get("signals", ())),
-            notes=cast(Any, value.get("notes", ())),
+            signals=cast(Any, value.get("signals")),
+            notes=cast(Any, value.get("notes")),
         )
 
 
@@ -383,6 +394,16 @@ def _reject_unknown_keys(
     unknown_keys = sorted(repr(key) for key in value if key not in allowed_keys)
     if unknown_keys:
         raise HarnessIOError(f"{field_name} has unknown fields: {', '.join(unknown_keys)}")
+
+
+def _require_keys(
+    value: Mapping[str, Any],
+    required_keys: frozenset[str],
+    field_name: str,
+) -> None:
+    missing_keys = sorted(repr(key) for key in required_keys if key not in value)
+    if missing_keys:
+        raise HarnessIOError(f"{field_name} is missing required fields: {', '.join(missing_keys)}")
 
 
 def _require_nonempty_text(value: Any, field_name: str) -> str:

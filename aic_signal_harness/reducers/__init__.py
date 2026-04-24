@@ -34,6 +34,7 @@ from aic_signal_harness.reducers.scoring_yaml import (
     attach_scoring_yaml_reduction,
     reduce_scoring_yaml,
 )
+from aic_signal_harness.reducers.training_dataset import derive_training_dataset_report
 
 __all__ = [
     "Hdf5DatasetReduction",
@@ -50,6 +51,7 @@ __all__ = [
     "derive_next_experiment_report",
     "derive_next_experiment_plan",
     "derive_reward_failure_reports",
+    "derive_training_dataset_report",
     "derive_training_signal_report",
     "promote_ledger_entry",
     "read_policy_trace_events",
