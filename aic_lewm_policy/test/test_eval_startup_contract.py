@@ -57,6 +57,7 @@ def test_gcp_eval_wrapper_passes_replay_dataset_contract_to_container() -> None:
     assert "AIC_MODEL_IMAGE_ID=" in launch_script
     assert "AIC_HARNESS_GATE_ID=" in launch_script
     assert "AIC_HARNESS_MIN_IMPROVEMENT=" in launch_script
+    assert "AIC_HARNESS_LEDGER_PATH=" in launch_script
     assert "AIC_HARNESS_BASELINE_PATH=" in launch_script
 
 

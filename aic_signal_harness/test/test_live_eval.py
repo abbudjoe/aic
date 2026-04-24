@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -8,12 +10,14 @@ import pytest
 from aic_signal_harness import (
     BackendKind,
     HarnessIOError,
-    LiveEvalFinalization,
     PromotionDecision,
     read_ledger_entries,
     read_json,
-    finalize_live_eval_run,
 )
+from aic_signal_harness.live_eval import LiveEvalFinalization, finalize_live_eval_run
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _write_scoring_yaml(path: Path, *, total: float = 7.5) -> None:
@@ -66,6 +70,18 @@ def _write_policy_trace(path: Path, *, run_id: str = "live-run-a") -> None:
         },
     ]
     path.write_text("\n".join(json.dumps(event, sort_keys=True) for event in events) + "\n")
+
+
+def test_live_eval_module_executes_with_warnings_as_errors() -> None:
+    result = subprocess.run(
+        [sys.executable, "-W", "error", "-m", "aic_signal_harness.live_eval", "--help"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert "Finalize a live AIC eval" in result.stdout
 
 
 def test_finalize_live_eval_run_writes_neutral_harness_artifacts(tmp_path: Path) -> None:

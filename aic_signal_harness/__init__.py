@@ -25,7 +25,6 @@ from aic_signal_harness.ledger import (
     append_ledger_entry,
     read_ledger_entries,
 )
-from aic_signal_harness.live_eval import LiveEvalFinalization, finalize_live_eval_run
 from aic_signal_harness.mcap_eval import (
     McapEvalBundleReport,
     McapEvalFirstContact,
@@ -117,7 +116,6 @@ __all__ = [
     "LedgerEntry",
     "LedgerMetric",
     "LedgerMetricGoal",
-    "LiveEvalFinalization",
     "McapEvalBundleReport",
     "McapEvalFirstContact",
     "McapEvalReduction",
@@ -165,7 +163,6 @@ __all__ = [
     "derive_reward_failure_reports",
     "experiment_spec_from_json",
     "experiment_spec_to_json",
-    "finalize_live_eval_run",
     "LegacyRunBackfill",
     "parse_scoring_yaml",
     "promote_ledger_entry",

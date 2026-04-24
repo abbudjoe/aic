@@ -70,6 +70,7 @@ export AIC_LEWM_POLICY_TRACE_REQUIRED='$(quote_for_remote "${AIC_LEWM_POLICY_TRA
 export AIC_LEWM_POLICY_TRACE_CONTAINER_PATH='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_CONTAINER_PATH:-/aic_results/harness/policy_trace.jsonl}")'
 export AIC_HARNESS_GATE_ID='$(quote_for_remote "${AIC_HARNESS_GATE_ID:-live_eval}")'
 export AIC_HARNESS_MIN_IMPROVEMENT='$(quote_for_remote "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}")'
+export AIC_HARNESS_LEDGER_PATH='$(quote_for_remote "${AIC_HARNESS_LEDGER_PATH:-}")'
 export AIC_HARNESS_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_BASELINE_PATH:-}")'
 export AIC_HARNESS_UPDATE_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_UPDATE_BASELINE_PATH:-}")'
 export AIC_HARNESS_EXPERIMENT_ID='$(quote_for_remote "${AIC_HARNESS_EXPERIMENT_ID:-}")'
