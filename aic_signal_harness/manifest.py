@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path, PureWindowsPath
+import re
 from typing import Any, Mapping, TypeVar
 
 from aic_signal_harness.artifacts import HarnessIOError
@@ -32,6 +34,7 @@ _RUN_MANIFEST_KEYS = frozenset(
         "notes",
     }
 )
+_URI_SOURCE_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
 
 
 class _StrEnum(str, Enum):
@@ -143,16 +146,39 @@ class RunManifest:
         except SchemaValidationError as exc:
             errors.extend(exc.errors)
 
+        scoring_artifacts: tuple[ArtifactRef, ...] = ()
+        if not errors:
+            scoring_artifacts = tuple(
+                artifact for artifact in self.artifacts if artifact.kind == "scoring_yaml"
+            )
+            if len(scoring_artifacts) > 1:
+                errors.append("run manifest must not include duplicate scoring_yaml artifacts")
+            for artifact in scoring_artifacts:
+                if _is_relative_local_source(artifact.path):
+                    errors.append(
+                        "scoring_yaml artifact.path must be an absolute local path when set"
+                    )
+
+        if isinstance(self.score, ScoreReport) and _is_relative_local_source(self.score.source):
+            errors.append("score.source must be an absolute local path or uri")
+
+        if not errors and self.score is not None:
+            if not _has_matching_scoring_artifact(scoring_artifacts, self.score.source):
+                errors.append(
+                    "manifests with score must include a scoring_yaml artifact "
+                    "whose path or uri matches score.source"
+                )
+            elif scoring_artifacts[0].sha256 is None:
+                errors.append(
+                    "manifests with score must bind score.source to a "
+                    "scoring_yaml artifact with sha256"
+                )
+
         if not errors and self.status in (RunStatus.completed, RunStatus.promoted):
             if not self.artifacts:
                 errors.append(f"{self.status.value} manifest must include at least one artifact")
             if self.score is None:
                 errors.append(f"{self.status.value} manifest must include a score report")
-            elif not _has_matching_scoring_artifact(self.artifacts, self.score.source):
-                errors.append(
-                    f"{self.status.value} manifest must include a scoring_yaml artifact "
-                    "whose path or uri matches score.source"
-                )
 
         if errors:
             raise SchemaValidationError(errors)
@@ -225,6 +251,41 @@ def _as_sequence(value: Any, field_name: str) -> tuple[Any, ...]:
 def _has_matching_scoring_artifact(artifacts: tuple[ArtifactRef, ...], score_source: str) -> bool:
     return any(
         artifact.kind == "scoring_yaml"
-        and (artifact.path == score_source or artifact.uri == score_source)
+        and (
+            _source_identities_match(artifact.path, score_source)
+            or _source_identities_match(artifact.uri, score_source)
+        )
         for artifact in artifacts
     )
+
+
+def _source_identities_match(left: str | None, right: str | None) -> bool:
+    if left is None or right is None:
+        return False
+    return _normalize_source_identity(left) == _normalize_source_identity(right)
+
+
+def _is_relative_local_source(source: str | None) -> bool:
+    if source is None:
+        return False
+    return not _is_uri_source(source) and not _is_absolute_local_source(source)
+
+
+def _normalize_source_identity(source: str) -> str:
+    if _is_uri_source(source):
+        return source
+    if _is_windows_absolute_local_source(source) and not Path(source).is_absolute():
+        return PureWindowsPath(source).as_posix()
+    return str(Path(source).resolve(strict=False))
+
+
+def _is_uri_source(source: str) -> bool:
+    return bool(_URI_SOURCE_RE.match(source))
+
+
+def _is_absolute_local_source(source: str) -> bool:
+    return Path(source).is_absolute() or _is_windows_absolute_local_source(source)
+
+
+def _is_windows_absolute_local_source(source: str) -> bool:
+    return PureWindowsPath(source).is_absolute()
