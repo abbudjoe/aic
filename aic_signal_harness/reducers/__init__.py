@@ -11,6 +11,7 @@ from aic_signal_harness.reducers.mcap_eval import (
     analyze_mcap_eval_bundle,
     reduce_mcap_eval_bundle,
 )
+from aic_signal_harness.reducers.next_experiment import derive_next_experiment_report
 from aic_signal_harness.reducers.promotion import promote_ledger_entry
 from aic_signal_harness.reducers.reward_failure import (
     RewardFailureReduction,
@@ -30,6 +31,7 @@ __all__ = [
     "analyze_mcap_eval_bundle",
     "attach_scoring_yaml_reduction",
     "build_ledger_entry",
+    "derive_next_experiment_report",
     "derive_reward_failure_reports",
     "promote_ledger_entry",
     "reduce_mcap_eval_bundle",

@@ -32,6 +32,14 @@ from aic_signal_harness.mcap_eval import (
     McapEvalTrialReport,
 )
 from aic_signal_harness.manifest import RunManifest, RunStatus
+from aic_signal_harness.next_experiment import (
+    NextExperimentAction,
+    NextExperimentCandidate,
+    NextExperimentCandidateKind,
+    NextExperimentDecision,
+    NextExperimentPriority,
+    NextExperimentReport,
+)
 from aic_signal_harness.promotion import (
     PromotionDecision,
     PromotionDecisionKind,
@@ -55,6 +63,7 @@ from aic_signal_harness.reducers import (
     analyze_mcap_eval_bundle,
     attach_scoring_yaml_reduction,
     build_ledger_entry,
+    derive_next_experiment_report,
     derive_reward_failure_reports,
     promote_ledger_entry,
     reduce_mcap_eval_bundle,
@@ -103,6 +112,12 @@ __all__ = [
     "McapEvalReduction",
     "McapEvalTaskHints",
     "McapEvalTrialReport",
+    "NextExperimentAction",
+    "NextExperimentCandidate",
+    "NextExperimentCandidateKind",
+    "NextExperimentDecision",
+    "NextExperimentPriority",
+    "NextExperimentReport",
     "PER_STEP_HDF5_DATASET_KEYS",
     "PolicyBackendSpec",
     "PromotionDecision",
@@ -129,6 +144,7 @@ __all__ = [
     "attach_scoring_yaml_reduction",
     "backfill_legacy_replay_policy_eval",
     "build_ledger_entry",
+    "derive_next_experiment_report",
     "derive_reward_failure_reports",
     "experiment_spec_from_json",
     "experiment_spec_to_json",
