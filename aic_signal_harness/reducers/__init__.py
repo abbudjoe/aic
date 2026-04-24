@@ -12,6 +12,10 @@ from aic_signal_harness.reducers.mcap_eval import (
     reduce_mcap_eval_bundle,
 )
 from aic_signal_harness.reducers.promotion import promote_ledger_entry
+from aic_signal_harness.reducers.reward_failure import (
+    RewardFailureReduction,
+    derive_reward_failure_reports,
+)
 from aic_signal_harness.reducers.scoring_yaml import (
     ScoringYamlReduction,
     attach_scoring_yaml_reduction,
@@ -21,10 +25,12 @@ from aic_signal_harness.reducers.scoring_yaml import (
 __all__ = [
     "Hdf5DatasetReduction",
     "McapEvalReduction",
+    "RewardFailureReduction",
     "ScoringYamlReduction",
     "analyze_mcap_eval_bundle",
     "attach_scoring_yaml_reduction",
     "build_ledger_entry",
+    "derive_reward_failure_reports",
     "promote_ledger_entry",
     "reduce_mcap_eval_bundle",
     "reduce_hdf5_dataset",

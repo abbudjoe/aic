@@ -41,19 +41,28 @@ from aic_signal_harness.promotion import (
     write_baseline_decision,
     write_promotion_decision,
 )
+from aic_signal_harness.failure import (
+    FailureKind,
+    FailureLabel,
+    FailureReport,
+    FailureSeverity,
+)
 from aic_signal_harness.reducers import (
     Hdf5DatasetReduction,
     McapEvalReduction,
+    RewardFailureReduction,
     ScoringYamlReduction,
     analyze_mcap_eval_bundle,
     attach_scoring_yaml_reduction,
     build_ledger_entry,
+    derive_reward_failure_reports,
     promote_ledger_entry,
     reduce_mcap_eval_bundle,
     reduce_hdf5_dataset,
     reduce_scoring_yaml,
     validate_hdf5_dataset,
 )
+from aic_signal_harness.reward import RewardReport, RewardSignalKind, RewardTerm
 from aic_signal_harness.schemas import (
     ArtifactRef,
     BackendKind,
@@ -75,6 +84,10 @@ __all__ = [
     "ArtifactRef",
     "BackendKind",
     "ExperimentSpec",
+    "FailureKind",
+    "FailureLabel",
+    "FailureReport",
+    "FailureSeverity",
     "Hdf5DatasetReduction",
     "Hdf5DatasetReport",
     "Hdf5DatasetStats",
@@ -99,6 +112,10 @@ __all__ = [
     "REQUIRED_HDF5_DATASET_KEYS",
     "RunManifest",
     "RunStatus",
+    "RewardFailureReduction",
+    "RewardReport",
+    "RewardSignalKind",
+    "RewardTerm",
     "ScoringYamlReduction",
     "ScoreReport",
     "RuntimeBoundaryProof",
@@ -112,6 +129,7 @@ __all__ = [
     "attach_scoring_yaml_reduction",
     "backfill_legacy_replay_policy_eval",
     "build_ledger_entry",
+    "derive_reward_failure_reports",
     "experiment_spec_from_json",
     "experiment_spec_to_json",
     "LegacyRunBackfill",
