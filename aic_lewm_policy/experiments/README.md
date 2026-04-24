@@ -32,3 +32,20 @@ PYTHONPATH=aic_lewm_policy "$HARNESS_PY" -m aic_lewm_policy.experiment_harness p
 
 Promotion means only that the run beat the current tracked baseline on the
 declared metric. It does not make a smoke run submission-ready.
+
+For new live evals, prefer the backend-neutral finalizer:
+
+```bash
+PYTHONPATH=. "$HARNESS_PY" -m aic_signal_harness.live_eval finalize \
+  --run-id <run_id> \
+  --result-root /path/to/aic_results/<run_id> \
+  --harness-root /path/to/aic_results/<run_id>/harness \
+  --scoring-yaml /path/to/aic_results/<run_id>/eval/scoring.yaml \
+  --policy-trace /path/to/aic_results/<run_id>/harness/policy_trace.jsonl \
+  --ledger /path/to/aic_results/<run_id>/harness/ledger.jsonl \
+  --model-image aic-lewm-learned:<run_id> \
+  --model-image-id sha256:<docker-image-id>
+```
+
+This writes the neutral `run_manifest.json`, reward/failure reports,
+`next_experiment.json`, and ledger entry from official eval evidence.

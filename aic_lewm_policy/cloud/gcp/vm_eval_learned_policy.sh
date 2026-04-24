@@ -3,6 +3,7 @@ set -euo pipefail
 
 AIC_EVAL_RUN_ID="${AIC_EVAL_RUN_ID:?Set AIC_EVAL_RUN_ID}"
 AIC_MODEL_IMAGE="${AIC_MODEL_IMAGE:-aic-lewm-learned:latest}"
+AIC_MODEL_IMAGE_ID="${AIC_MODEL_IMAGE_ID:-$(sudo docker image inspect --format '{{.Id}}' "$AIC_MODEL_IMAGE")}"
 AIC_EVAL_IMAGE="${AIC_EVAL_IMAGE:-ghcr.io/intrinsic-dev/aic/aic_eval:latest}"
 AIC_EVAL_TIMEOUT_SEC="${AIC_EVAL_TIMEOUT_SEC:-1800}"
 
@@ -26,6 +27,7 @@ if [[ -z "$POLICY_TRACE_RELATIVE_PATH" ]]; then
   exit 2
 fi
 POLICY_TRACE_HOST_PATH="$HARNESS_ROOT/$POLICY_TRACE_RELATIVE_PATH"
+HARNESS_LEDGER_PATH="${AIC_HARNESS_LEDGER_PATH:-$HARNESS_ROOT/ledger.jsonl}"
 # Docker network DNS labels have practical length limits; keep the full run id
 # for result paths, but use a short deterministic alias for container hostnames.
 SAFE_PREFIX="$(printf '%s' "$AIC_EVAL_RUN_ID" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-36)"
@@ -157,31 +159,54 @@ if [[ "$POLICY_TRACE_REQUIRED" != "0" && "$POLICY_TRACE_REQUIRED" != "false" ]];
   fi
 fi
 
-if [[ -s "$POLICY_TRACE_HOST_PATH" ]]; then
-  export AIC_POLICY_TRACE_HOST_PATH="$POLICY_TRACE_HOST_PATH"
-  export AIC_POLICY_TRACE_REPORT_PATH="$HARNESS_ROOT/policy_trace_report.json"
-  export AIC_POLICY_TRACE_ARTIFACT_PATH="$HARNESS_ROOT/policy_trace_artifact.json"
-  export AIC_POLICY_TRACE_RUN_ID="$AIC_EVAL_RUN_ID"
-  PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" python3 - <<'PY'
-import os
-
-from aic_signal_harness import reduce_policy_trace_jsonl, write_json
-
-trace_path = os.environ["AIC_POLICY_TRACE_HOST_PATH"]
-report_path = os.environ["AIC_POLICY_TRACE_REPORT_PATH"]
-artifact_path = os.environ["AIC_POLICY_TRACE_ARTIFACT_PATH"]
-run_id = os.environ["AIC_POLICY_TRACE_RUN_ID"]
-reduction = reduce_policy_trace_jsonl(
-    trace_path,
-    provenance={
-        "producer": "aic_lewm_policy/cloud/gcp/vm_eval_learned_policy.sh",
-        "run_id": run_id,
-    },
+FINALIZE_ARGS=(
+  -m aic_signal_harness.live_eval
+  finalize
+  --run-id "$AIC_EVAL_RUN_ID"
+  --result-root "$RESULT_ROOT"
+  --harness-root "$HARNESS_ROOT"
+  --scoring-yaml "$RESULT_ROOT/eval/scoring.yaml"
+  --ledger "$HARNESS_LEDGER_PATH"
+  --model-image "$AIC_MODEL_IMAGE"
+  --model-image-id "$AIC_MODEL_IMAGE_ID"
+  --planner-mode "${AIC_LEWM_PLANNER_MODE:-lewm_mpc}"
+  --gate-id "${AIC_HARNESS_GATE_ID:-live_eval}"
+  --min-improvement "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}"
 )
-write_json(report_path, reduction.report.to_dict(), overwrite=True)
-write_json(artifact_path, reduction.artifact.to_dict(), overwrite=True)
-PY
+if [[ -s "$POLICY_TRACE_HOST_PATH" ]]; then
+  FINALIZE_ARGS+=(--policy-trace "$POLICY_TRACE_HOST_PATH")
 fi
+if [[ -n "${AIC_HARNESS_BASELINE_PATH:-}" ]]; then
+  FINALIZE_ARGS+=(--baseline "$AIC_HARNESS_BASELINE_PATH")
+fi
+if [[ -n "${AIC_HARNESS_UPDATE_BASELINE_PATH:-}" ]]; then
+  FINALIZE_ARGS+=(--update-baseline "$AIC_HARNESS_UPDATE_BASELINE_PATH")
+fi
+if [[ -n "${AIC_HARNESS_EXPERIMENT_ID:-}" ]]; then
+  FINALIZE_ARGS+=(--experiment-id "$AIC_HARNESS_EXPERIMENT_ID")
+fi
+if [[ -n "${AIC_HARNESS_HYPOTHESIS:-}" ]]; then
+  FINALIZE_ARGS+=(--hypothesis "$AIC_HARNESS_HYPOTHESIS")
+fi
+if [[ -n "${AIC_HARNESS_BACKEND_KIND:-}" ]]; then
+  FINALIZE_ARGS+=(--backend-kind "$AIC_HARNESS_BACKEND_KIND")
+fi
+if [[ "${AIC_HARNESS_BOOTSTRAP_PROMOTION:-0}" != "0" && "${AIC_HARNESS_BOOTSTRAP_PROMOTION:-0}" != "false" ]]; then
+  FINALIZE_ARGS+=(--bootstrap-promotion)
+fi
+if [[ "${AIC_HARNESS_ELIGIBLE_FOR_SUBMISSION:-0}" != "0" && "${AIC_HARNESS_ELIGIBLE_FOR_SUBMISSION:-0}" != "false" ]]; then
+  FINALIZE_ARGS+=(--eligible-for-submission)
+fi
+if [[ "${AIC_HARNESS_OVERWRITE:-0}" != "0" && "${AIC_HARNESS_OVERWRITE:-0}" != "false" ]]; then
+  FINALIZE_ARGS+=(--overwrite)
+fi
+if [[ "${AIC_HARNESS_NO_APPEND_LEDGER:-0}" != "0" && "${AIC_HARNESS_NO_APPEND_LEDGER:-0}" != "false" ]]; then
+  FINALIZE_ARGS+=(--no-append-ledger)
+fi
+if [[ "${AIC_HARNESS_NO_NEXT_EXPERIMENT:-0}" != "0" && "${AIC_HARNESS_NO_NEXT_EXPERIMENT:-0}" != "false" ]]; then
+  FINALIZE_ARGS+=(--no-next-experiment)
+fi
+PYTHONPATH="$PWD${PYTHONPATH:+:$PYTHONPATH}" python3 "${FINALIZE_ARGS[@]}"
 
 echo "AIC_EVAL_RESULT_ROOT=$RESULT_ROOT"
 if [[ -f "$RESULT_ROOT/eval/scoring.yaml" ]]; then
@@ -195,4 +220,16 @@ if [[ -f "$HARNESS_ROOT/policy_trace_report.json" ]]; then
 fi
 if [[ -f "$HARNESS_ROOT/policy_trace_artifact.json" ]]; then
   echo "AIC_POLICY_TRACE_ARTIFACT_PATH=$HARNESS_ROOT/policy_trace_artifact.json"
+fi
+if [[ -f "$HARNESS_ROOT/run_manifest.json" ]]; then
+  echo "AIC_HARNESS_MANIFEST_PATH=$HARNESS_ROOT/run_manifest.json"
+fi
+if [[ -f "$HARNESS_ROOT/ledger_entry.json" ]]; then
+  echo "AIC_HARNESS_LEDGER_ENTRY_PATH=$HARNESS_ROOT/ledger_entry.json"
+fi
+if [[ -f "$HARNESS_ROOT/next_experiment.json" ]]; then
+  echo "AIC_HARNESS_NEXT_EXPERIMENT_PATH=$HARNESS_ROOT/next_experiment.json"
+fi
+if [[ -f "$HARNESS_ROOT/live_eval_summary.json" ]]; then
+  echo "AIC_HARNESS_SUMMARY_PATH=$HARNESS_ROOT/live_eval_summary.json"
 fi

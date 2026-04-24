@@ -54,9 +54,13 @@ def test_gcp_eval_wrapper_passes_replay_dataset_contract_to_container() -> None:
     assert "AIC_LEWM_POLICY_TRACE_PATH=" in vm_script
     assert "AIC_LEWM_POLICY_TRACE_RUN_ID=" in vm_script
     assert "AIC_LEWM_POLICY_TRACE_REQUIRED=" in launch_script
+    assert "AIC_MODEL_IMAGE_ID=" in launch_script
+    assert "AIC_HARNESS_GATE_ID=" in launch_script
+    assert "AIC_HARNESS_MIN_IMPROVEMENT=" in launch_script
+    assert "AIC_HARNESS_BASELINE_PATH=" in launch_script
 
 
-def test_eval_wrapper_reduces_policy_trace_into_harness_report() -> None:
+def test_eval_wrapper_finalizes_live_eval_with_neutral_harness() -> None:
     vm_script = (
         REPO_ROOT / "aic_lewm_policy/cloud/gcp/vm_eval_learned_policy.sh"
     ).read_text(encoding="utf-8")
@@ -66,10 +70,17 @@ def test_eval_wrapper_reduces_policy_trace_into_harness_report() -> None:
     assert 'POLICY_TRACE_HOST_PATH="$HARNESS_ROOT/$POLICY_TRACE_RELATIVE_PATH"' in vm_script
     assert "AIC_LEWM_POLICY_TRACE_CONTAINER_PATH must live under" in vm_script
     assert '-v "$HARNESS_ROOT:/aic_results/harness"' in vm_script
-    assert "reduce_policy_trace_jsonl" in vm_script
+    assert "-m aic_signal_harness.live_eval" in vm_script
+    assert "--scoring-yaml" in vm_script
+    assert "--model-image-id" in vm_script
+    assert "--policy-trace" in vm_script
+    assert "--ledger" in vm_script
     assert "policy_trace_report.json" in vm_script
     assert "policy_trace_artifact.json" in vm_script
     assert "AIC_POLICY_TRACE_ARTIFACT_PATH=" in vm_script
+    assert "AIC_HARNESS_MANIFEST_PATH=" in vm_script
+    assert "AIC_HARNESS_LEDGER_ENTRY_PATH=" in vm_script
+    assert "AIC_HARNESS_NEXT_EXPERIMENT_PATH=" in vm_script
     assert "Missing required policy trace JSONL" in vm_script
 
 

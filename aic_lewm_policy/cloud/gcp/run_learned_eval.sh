@@ -57,15 +57,29 @@ if [[ '$(quote_for_remote "${AIC_MODEL_SKIP_BUILD:-0}")' == '1' ]]; then
 else
   sudo DOCKER_BUILDKIT=1 docker build -f docker/aic_lewm_policy/Dockerfile -t '$(quote_for_remote "$AIC_MODEL_IMAGE")' .
 fi
+AIC_MODEL_IMAGE_ID=\"\$(sudo docker image inspect --format '{{.Id}}' '$(quote_for_remote "$AIC_MODEL_IMAGE")')\"
 chmod +x ~/vm_eval_learned_policy.sh
 export AIC_EVAL_RUN_ID='$(quote_for_remote "$AIC_EVAL_RUN_ID")'
 export AIC_MODEL_IMAGE='$(quote_for_remote "$AIC_MODEL_IMAGE")'
+export AIC_MODEL_IMAGE_ID=\"\$AIC_MODEL_IMAGE_ID\"
 export AIC_EVAL_IMAGE='$(quote_for_remote "${AIC_EVAL_IMAGE:-ghcr.io/intrinsic-dev/aic/aic_eval:latest}")'
 export AIC_EVAL_USE_LOCAL_LAUNCH='$(quote_for_remote "${AIC_EVAL_USE_LOCAL_LAUNCH:-1}")'
 export AIC_GZ_VERBOSITY_LEVEL='$(quote_for_remote "${AIC_GZ_VERBOSITY_LEVEL:-1}")'
 export AIC_DOCKER_GPUS='$(quote_for_remote "${AIC_DOCKER_GPUS:-0}")'
 export AIC_LEWM_POLICY_TRACE_REQUIRED='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_REQUIRED:-1}")'
 export AIC_LEWM_POLICY_TRACE_CONTAINER_PATH='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_CONTAINER_PATH:-/aic_results/harness/policy_trace.jsonl}")'
+export AIC_HARNESS_GATE_ID='$(quote_for_remote "${AIC_HARNESS_GATE_ID:-live_eval}")'
+export AIC_HARNESS_MIN_IMPROVEMENT='$(quote_for_remote "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}")'
+export AIC_HARNESS_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_BASELINE_PATH:-}")'
+export AIC_HARNESS_UPDATE_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_UPDATE_BASELINE_PATH:-}")'
+export AIC_HARNESS_EXPERIMENT_ID='$(quote_for_remote "${AIC_HARNESS_EXPERIMENT_ID:-}")'
+export AIC_HARNESS_HYPOTHESIS='$(quote_for_remote "${AIC_HARNESS_HYPOTHESIS:-}")'
+export AIC_HARNESS_BACKEND_KIND='$(quote_for_remote "${AIC_HARNESS_BACKEND_KIND:-}")'
+export AIC_HARNESS_BOOTSTRAP_PROMOTION='$(quote_for_remote "${AIC_HARNESS_BOOTSTRAP_PROMOTION:-0}")'
+export AIC_HARNESS_ELIGIBLE_FOR_SUBMISSION='$(quote_for_remote "${AIC_HARNESS_ELIGIBLE_FOR_SUBMISSION:-0}")'
+export AIC_HARNESS_OVERWRITE='$(quote_for_remote "${AIC_HARNESS_OVERWRITE:-0}")'
+export AIC_HARNESS_NO_APPEND_LEDGER='$(quote_for_remote "${AIC_HARNESS_NO_APPEND_LEDGER:-0}")'
+export AIC_HARNESS_NO_NEXT_EXPERIMENT='$(quote_for_remote "${AIC_HARNESS_NO_NEXT_EXPERIMENT:-0}")'
 	export AIC_EVAL_TIMEOUT_SEC='$(quote_for_remote "${AIC_EVAL_TIMEOUT_SEC:-1800}")'
 	export AIC_LEWM_PLANNER_MODE='$(quote_for_remote "${AIC_LEWM_PLANNER_MODE:-lewm_mpc}")'
 	export AIC_LEWM_DEVICE='$(quote_for_remote "${AIC_LEWM_DEVICE:-cpu}")'

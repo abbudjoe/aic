@@ -104,3 +104,30 @@ PYTHONPATH=aic_lewm_policy "$HARNESS_PY" -m aic_lewm_policy.experiment_harness \
   promote aic_lewm_policy/experiments/runs/<run-id>/manifest.json \
   --min-improvement 1.0
 ```
+
+Learned-policy evals now call the backend-neutral live eval finalizer after the
+official evaluator exits. The finalizer writes typed harness outputs under
+`$AIC_EVAL_RESULT_ROOT/harness/`, including:
+
+- `run_manifest.json`
+- `score_report.json`
+- `policy_trace_report.json` and `policy_trace_artifact.json` when tracing is enabled
+- `reward_report.json` and `failure_report.json`
+- `promotion_report.json` when `AIC_HARNESS_BASELINE_PATH` or
+  `AIC_HARNESS_BOOTSTRAP_PROMOTION=1` is set
+- `next_experiment.json`
+- `ledger_entry.json` and the run-local `ledger.jsonl`
+
+Useful knobs:
+
+```bash
+export AIC_HARNESS_BASELINE_PATH=/absolute/path/to/neutral_baseline.json
+export AIC_HARNESS_UPDATE_BASELINE_PATH=/absolute/path/to/neutral_baseline.json
+export AIC_HARNESS_BOOTSTRAP_PROMOTION=0
+export AIC_HARNESS_MIN_IMPROVEMENT=1.0
+export AIC_HARNESS_NO_NEXT_EXPERIMENT=0
+```
+
+For GCP runs, harness paths are interpreted on the remote VM. The launcher
+records the immutable Docker image id for the learned-policy image and passes it
+to the finalizer as policy artifact provenance.
