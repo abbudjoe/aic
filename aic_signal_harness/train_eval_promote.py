@@ -24,6 +24,7 @@ from aic_signal_harness.artifacts import (
     sha256_file,
     write_json,
 )
+from aic_signal_harness.constants import DEFAULT_RUNTIME_CHECKPOINT_CONTAINER_PATH
 from aic_signal_harness.live_eval import (
     LiveEvalFinalization,
     finalize_live_eval_run,
@@ -53,8 +54,6 @@ POLICY_TRAINING_REPORT_KIND = "policy_training_report"
 POLICY_CHECKPOINT_KIND = "policy_checkpoint"
 TRAIN_EVAL_PROMOTE_SUMMARY_NAME = "train_eval_promote_summary.json"
 TRAINED_POLICY_EVAL_BINDING_NAME = "trained_policy_eval_binding.json"
-DEFAULT_RUNTIME_CHECKPOINT_CONTAINER_PATH = "/opt/aic_lewm/aic_lewm_epoch_100_object.ckpt"
-
 _BINDING_REPORT_KEYS = frozenset(
     {
         "schema_version",
