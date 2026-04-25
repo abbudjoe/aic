@@ -177,6 +177,9 @@ def finalize_live_eval_run(
     hypothesis: str | None = None,
     model_image: str | None = None,
     model_image_id: str | None = None,
+    policy_checkpoint: str | Path | None = None,
+    backend: PolicyBackendSpec | Mapping[str, Any] | None = None,
+    extra_manifest_artifacts: tuple[ArtifactRef | Mapping[str, Any], ...] = (),
     backend_kind: str | BackendKind | None = None,
     planner_mode: str | None = None,
     runtime_env: Mapping[str, str] | None = None,
@@ -206,14 +209,20 @@ def finalize_live_eval_run(
         run_id=run_id,
         reduced_at_utc=generated_at,
     )
-    backend = _backend_spec(
-        run_id=run_id,
-        model_image=model_image,
-        model_image_id=model_image_id,
-        backend_kind=backend_kind,
-        planner_mode=planner_mode,
-        runtime_env=env,
+    backend_spec = (
+        _typed_backend_override(backend)
+        if backend is not None
+        else _backend_spec(
+            run_id=run_id,
+            model_image=model_image,
+            model_image_id=model_image_id,
+            policy_checkpoint=policy_checkpoint,
+            backend_kind=backend_kind,
+            planner_mode=planner_mode,
+            runtime_env=env,
+        )
     )
+    extra_artifacts = _typed_extra_manifest_artifacts(extra_manifest_artifacts)
     score_report_path = harness_root / "score_report.json"
     scoring_artifact_path = harness_root / "scoring_yaml_artifact.json"
     policy_trace_report_path = (
@@ -246,7 +255,7 @@ def finalize_live_eval_run(
     summary_path = harness_root / "live_eval_summary.json"
     typed_ledger_path = None if ledger_path is None else Path(ledger_path).expanduser()
     base_artifacts = (
-        (scoring_reduction.artifact,)
+        (scoring_reduction.artifact, *extra_artifacts)
         + (
             ()
             if policy_trace_reduction is None
@@ -256,7 +265,7 @@ def finalize_live_eval_run(
     base_manifest = RunManifest(
         run_id=run_id,
         status=RunStatus.completed,
-        backend=backend,
+        backend=backend_spec,
         created_at_utc=generated_at,
         updated_at_utc=generated_at,
         artifacts=base_artifacts,
@@ -974,6 +983,7 @@ def _backend_spec(
     run_id: str,
     model_image: str | None,
     model_image_id: str | None,
+    policy_checkpoint: str | Path | None,
     backend_kind: str | BackendKind | None,
     planner_mode: str | None,
     runtime_env: Mapping[str, str],
@@ -988,11 +998,20 @@ def _backend_spec(
     )
     image = _optional_text(model_image, "model_image") or "aic-lewm-learned:latest"
     image_sha256 = _docker_image_sha256(model_image_id) if kind is BackendKind.lewm_world_model else None
-    policy_artifact = ArtifactRef(
+    docker_artifact = ArtifactRef(
         kind="docker_image",
         uri=_docker_uri(image),
         sha256=image_sha256,
         provenance={"run_id": run_id},
+    )
+    policy_artifact = (
+        _runtime_policy_checkpoint_artifact(
+            policy_checkpoint,
+            run_id=run_id,
+            runtime_env=runtime_env,
+        )
+        if policy_checkpoint is not None
+        else docker_artifact
     )
     runtime_boundary = RuntimeBoundaryProof(
         deterministic=True,
@@ -1023,9 +1042,68 @@ def _backend_spec(
             "producer": "aic_signal_harness.live_eval",
             "model_image": image,
             "model_image_id": _optional_text(model_image_id, "model_image_id"),
+            "docker_artifact": docker_artifact.to_dict(),
             "runtime_env": dict(runtime_env),
         },
     )
+
+
+def _runtime_policy_checkpoint_artifact(
+    policy_checkpoint: str | Path,
+    *,
+    run_id: str,
+    runtime_env: Mapping[str, str],
+) -> ArtifactRef:
+    checkpoint_path = Path(policy_checkpoint).expanduser().resolve(strict=False)
+    if not checkpoint_path.exists():
+        raise HarnessIOError(f"policy_checkpoint does not exist: {checkpoint_path}")
+    if not checkpoint_path.is_file():
+        raise HarnessIOError(f"policy_checkpoint must be a file: {checkpoint_path}")
+    container_path = _require_text(
+        runtime_env.get("AIC_LEWM_CHECKPOINT"),
+        "runtime_env.AIC_LEWM_CHECKPOINT",
+    )
+    return ArtifactRef(
+        kind="policy_checkpoint",
+        path=str(checkpoint_path),
+        sha256=sha256_file(checkpoint_path),
+        provenance={
+            "producer": "aic_signal_harness.live_eval",
+            "run_id": run_id,
+            "derivation": "bind_runtime_policy_checkpoint",
+            "container_path": container_path,
+        },
+    )
+
+
+def _typed_backend_override(
+    backend: PolicyBackendSpec | Mapping[str, Any],
+) -> PolicyBackendSpec:
+    if isinstance(backend, PolicyBackendSpec):
+        return backend
+    try:
+        return PolicyBackendSpec.from_dict(backend)
+    except Exception as exc:
+        raise HarnessIOError(f"live eval backend override is invalid: {exc}") from exc
+
+
+def _typed_extra_manifest_artifacts(
+    artifacts: tuple[ArtifactRef | Mapping[str, Any], ...],
+) -> tuple[ArtifactRef, ...]:
+    if not isinstance(artifacts, tuple):
+        raise HarnessIOError("extra_manifest_artifacts must be a tuple")
+    typed_artifacts: list[ArtifactRef] = []
+    for index, artifact in enumerate(artifacts):
+        if isinstance(artifact, ArtifactRef):
+            typed_artifacts.append(artifact)
+            continue
+        try:
+            typed_artifacts.append(ArtifactRef.from_dict(artifact))
+        except Exception as exc:
+            raise HarnessIOError(
+                f"extra_manifest_artifacts[{index}] is invalid: {exc}"
+            ) from exc
+    return tuple(typed_artifacts)
 
 
 def _docker_uri(image: str) -> str:
@@ -1047,6 +1125,12 @@ def _runtime_env_from_mapping(runtime_env: Mapping[str, str] | None) -> dict[str
         for key in _RUNTIME_ENV_KEYS
         if key in source and str(source[key]).strip()
     }
+
+
+def runtime_env_from_mapping(runtime_env: Mapping[str, str] | None) -> dict[str, str]:
+    """Return the live-eval runtime environment fields recorded by the harness."""
+
+    return _runtime_env_from_mapping(runtime_env)
 
 
 def _resolve_existing_dir(path: str | Path, field_name: str) -> Path:
@@ -1097,6 +1181,7 @@ def _cmd_finalize(args: argparse.Namespace) -> int:
         hypothesis=args.hypothesis,
         model_image=args.model_image,
         model_image_id=args.model_image_id,
+        policy_checkpoint=args.policy_checkpoint,
         backend_kind=args.backend_kind,
         planner_mode=args.planner_mode,
         overwrite=args.overwrite,
@@ -1135,6 +1220,7 @@ def build_parser() -> argparse.ArgumentParser:
     finalize.add_argument("--hypothesis")
     finalize.add_argument("--model-image")
     finalize.add_argument("--model-image-id")
+    finalize.add_argument("--policy-checkpoint")
     finalize.add_argument("--backend-kind")
     finalize.add_argument("--planner-mode")
     finalize.add_argument("--overwrite", action="store_true", default=_bool_env("AIC_HARNESS_OVERWRITE"))

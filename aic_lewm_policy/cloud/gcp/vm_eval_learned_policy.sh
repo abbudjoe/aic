@@ -52,6 +52,43 @@ if [[ "${AIC_LEWM_POLICY_TRACE_REQUIRED:-1}" != "0" && "${AIC_LEWM_POLICY_TRACE_
 fi
 POLICY_TRACE_HOST_PATH="$HARNESS_ROOT/$POLICY_TRACE_RELATIVE_PATH"
 HARNESS_LEDGER_PATH="${AIC_HARNESS_LEDGER_PATH:-$HARNESS_ROOT/ledger.jsonl}"
+POLICY_TRAINING_REPORT_PATH="${AIC_POLICY_TRAINING_REPORT_PATH:-${AIC_HARNESS_POLICY_TRAINING_REPORT_PATH:-}}"
+POLICY_TRAINING_REPORT_REQUIRED="${AIC_POLICY_TRAINING_REPORT_REQUIRED:-${AIC_HARNESS_POLICY_TRAINING_REPORT_REQUIRED:-0}}"
+RUNTIME_POLICY_CHECKPOINT_PATH="${AIC_RUNTIME_POLICY_CHECKPOINT_PATH:-$PWD/aic_lewm_policy/runtime_artifacts/aic_lewm_epoch_100_object.ckpt}"
+RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH="${AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH:-${AIC_LEWM_CHECKPOINT:-/opt/aic_lewm/aic_lewm_epoch_100_object.ckpt}}"
+case "$RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH" in
+  /*) ;;
+  *)
+    echo "AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH must be absolute" >&2
+    exit 2
+    ;;
+esac
+case "/${RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH#/}/" in
+  */../* | */./* | *//*)
+    echo "AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH must not contain relative path segments" >&2
+    exit 2
+    ;;
+esac
+if [[ -z "$POLICY_TRAINING_REPORT_PATH" ]]; then
+  if [[ "$POLICY_TRAINING_REPORT_REQUIRED" != "0" \
+    && "$POLICY_TRAINING_REPORT_REQUIRED" != "false" ]]; then
+    echo "AIC_POLICY_TRAINING_REPORT_PATH is required for trained policy eval finalization" >&2
+    exit 2
+  fi
+  if [[ "${AIC_HARNESS_GATE_ID:-}" == "trained_policy_live_eval" ]]; then
+    echo "AIC_HARNESS_GATE_ID=trained_policy_live_eval requires AIC_POLICY_TRAINING_REPORT_PATH" >&2
+    exit 2
+  fi
+else
+  if [[ ! -f "$POLICY_TRAINING_REPORT_PATH" ]]; then
+    echo "AIC_POLICY_TRAINING_REPORT_PATH must point to a file: $POLICY_TRAINING_REPORT_PATH" >&2
+    exit 2
+  fi
+  if [[ ! -f "$RUNTIME_POLICY_CHECKPOINT_PATH" ]]; then
+    echo "AIC_RUNTIME_POLICY_CHECKPOINT_PATH must point to a file: $RUNTIME_POLICY_CHECKPOINT_PATH" >&2
+    exit 2
+  fi
+fi
 # Docker network DNS labels have practical length limits; keep the full run id
 # for result paths, but use a short deterministic alias for container hostnames.
 SAFE_PREFIX="$(printf '%s' "$AIC_EVAL_RUN_ID" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-36)"
@@ -61,10 +98,17 @@ NETWORK_NAME="aic_eval_${SAFE_RUN_ID}"
 EVAL_CONTAINER="aic_eval_${SAFE_RUN_ID}"
 MODEL_CONTAINER="aic_model_${SAFE_RUN_ID}"
 EVAL_DOCKER_ARGS=()
+MODEL_DOCKER_ARGS=()
 DOCKER_GPU_ARGS=()
 
 if [[ "${AIC_DOCKER_GPUS:-0}" != "0" && "${AIC_DOCKER_GPUS:-0}" != "false" ]]; then
   DOCKER_GPU_ARGS=(--gpus "${AIC_DOCKER_GPUS:-all}")
+fi
+
+if [[ -n "$POLICY_TRAINING_REPORT_PATH" ]]; then
+  MODEL_DOCKER_ARGS+=(
+    -v "$RUNTIME_POLICY_CHECKPOINT_PATH:$RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH:ro"
+  )
 fi
 
 if [[ "${AIC_EVAL_USE_LOCAL_LAUNCH:-1}" != "0" ]]; then
@@ -123,6 +167,7 @@ sudo docker run -d \
   "${DOCKER_GPU_ARGS[@]}" \
   --network "$NETWORK_NAME" \
   -v "$HARNESS_ROOT:/aic_results/harness" \
+  "${MODEL_DOCKER_ARGS[@]}" \
   -e RMW_IMPLEMENTATION=rmw_zenoh_cpp \
   -e ZENOH_ROUTER_CHECK_ATTEMPTS=-1 \
   -e AIC_ROUTER_ADDR="$EVAL_CONTAINER:7447" \
@@ -134,6 +179,7 @@ sudo docker run -d \
   -e AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP="${AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP:-}" \
   -e AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID="${AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID:-0}" \
   -e AIC_LEWM_PLANNER_MODE="${AIC_LEWM_PLANNER_MODE:-lewm_mpc}" \
+  -e AIC_LEWM_CHECKPOINT="$RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH" \
   -e AIC_LEWM_DEVICE="${AIC_LEWM_DEVICE:-cpu}" \
   -e AIC_LEWM_REQUIRE_CHECKPOINT="${AIC_LEWM_REQUIRE_CHECKPOINT:-1}" \
   -e AIC_LEWM_GOAL_DATASET="${AIC_LEWM_GOAL_DATASET:-/opt/aic_lewm/aic_qualification_train.h5}" \
@@ -186,20 +232,40 @@ if [[ "$POLICY_TRACE_REQUIRED" != "0" && "$POLICY_TRACE_REQUIRED" != "false" ]];
   fi
 fi
 
-FINALIZE_ARGS=(
-  -m aic_signal_harness.live_eval
-  finalize
-  --run-id "$AIC_EVAL_RUN_ID"
-  --result-root "$RESULT_ROOT"
-  --harness-root "$HARNESS_ROOT"
-  --scoring-yaml "$RESULT_ROOT/eval/scoring.yaml"
-  --ledger "$HARNESS_LEDGER_PATH"
-  --model-image "$AIC_MODEL_IMAGE"
-  --model-image-id "$AIC_MODEL_IMAGE_ID"
-  --planner-mode "${AIC_LEWM_PLANNER_MODE:-lewm_mpc}"
-  --gate-id "${AIC_HARNESS_GATE_ID:-live_eval}"
-  --min-improvement "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}"
-)
+if [[ -n "$POLICY_TRAINING_REPORT_PATH" ]]; then
+  FINALIZE_ARGS=(
+    -m aic_signal_harness.train_eval_promote
+    finalize
+    --run-id "$AIC_EVAL_RUN_ID"
+    --result-root "$RESULT_ROOT"
+    --harness-root "$HARNESS_ROOT"
+    --scoring-yaml "$RESULT_ROOT/eval/scoring.yaml"
+    --ledger "$HARNESS_LEDGER_PATH"
+    --policy-training-report "$POLICY_TRAINING_REPORT_PATH"
+    --runtime-policy-checkpoint "$RUNTIME_POLICY_CHECKPOINT_PATH"
+    --runtime-checkpoint-container-path "$RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH"
+    --model-image "$AIC_MODEL_IMAGE"
+    --model-image-id "$AIC_MODEL_IMAGE_ID"
+    --planner-mode "${AIC_LEWM_PLANNER_MODE:-lewm_mpc}"
+    --gate-id "${AIC_HARNESS_GATE_ID:-trained_policy_live_eval}"
+    --min-improvement "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}"
+  )
+else
+  FINALIZE_ARGS=(
+    -m aic_signal_harness.live_eval
+    finalize
+    --run-id "$AIC_EVAL_RUN_ID"
+    --result-root "$RESULT_ROOT"
+    --harness-root "$HARNESS_ROOT"
+    --scoring-yaml "$RESULT_ROOT/eval/scoring.yaml"
+    --ledger "$HARNESS_LEDGER_PATH"
+    --model-image "$AIC_MODEL_IMAGE"
+    --model-image-id "$AIC_MODEL_IMAGE_ID"
+    --planner-mode "${AIC_LEWM_PLANNER_MODE:-lewm_mpc}"
+    --gate-id "${AIC_HARNESS_GATE_ID:-live_eval}"
+    --min-improvement "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}"
+  )
+fi
 if [[ -s "$POLICY_TRACE_HOST_PATH" ]]; then
   FINALIZE_ARGS+=(--policy-trace "$POLICY_TRACE_HOST_PATH")
 fi
@@ -259,4 +325,10 @@ if [[ -f "$HARNESS_ROOT/next_experiment.json" ]]; then
 fi
 if [[ -f "$HARNESS_ROOT/live_eval_summary.json" ]]; then
   echo "AIC_HARNESS_SUMMARY_PATH=$HARNESS_ROOT/live_eval_summary.json"
+fi
+if [[ -f "$HARNESS_ROOT/trained_policy_eval_binding.json" ]]; then
+  echo "AIC_TRAIN_EVAL_PROMOTE_BINDING_PATH=$HARNESS_ROOT/trained_policy_eval_binding.json"
+fi
+if [[ -f "$HARNESS_ROOT/train_eval_promote_summary.json" ]]; then
+  echo "AIC_TRAIN_EVAL_PROMOTE_SUMMARY_PATH=$HARNESS_ROOT/train_eval_promote_summary.json"
 fi

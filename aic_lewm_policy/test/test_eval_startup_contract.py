@@ -72,6 +72,25 @@ def test_gcp_eval_wrapper_passes_replay_dataset_contract_to_container() -> None:
     assert "AIC_HARNESS_MIN_IMPROVEMENT=" in launch_script
     assert "AIC_HARNESS_LEDGER_PATH=" in launch_script
     assert "AIC_HARNESS_BASELINE_PATH=" in launch_script
+    assert "AIC_POLICY_TRAINING_REPORT_PATH=" in launch_script
+    assert "AIC_POLICY_TRAINING_REPORT_REQUIRED=" in launch_script
+    assert "AIC_RUNTIME_POLICY_CHECKPOINT_PATH=" in launch_script
+    assert "AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH=" in launch_script
+    assert "stage-training-bundle" in launch_script
+    assert "AIC_STAGED_RUNTIME_POLICY_CHECKPOINT_PATH" in launch_script
+    assert "AIC_RUNTIME_POLICY_CHECKPOINT_PATH must not be set with AIC_POLICY_TRAINING_REPORT_PATH" in launch_script
+    assert "REMOTE_POLICY_TRAINING_REPORT_PATH" in launch_script
+    assert "REMOTE_RUNTIME_POLICY_CHECKPOINT_PATH" in launch_script
+    assert "AIC_POLICY_TRAINING_REPORT_REQUIRED='$(quote_for_remote \"$POLICY_TRAINING_REPORT_REQUIRED\")'" in launch_script
+    assert "AIC_HARNESS_GATE_ID:-live_eval" not in launch_script
+    assert "POLICY_TRAINING_REPORT_PATH=" in vm_script
+    assert "AIC_HARNESS_GATE_ID=trained_policy_live_eval requires AIC_POLICY_TRAINING_REPORT_PATH" in vm_script
+    assert "-e AIC_LEWM_CHECKPOINT=" in vm_script
+    assert "$RUNTIME_POLICY_CHECKPOINT_PATH:$RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH:ro" in vm_script
+    assert "-m aic_signal_harness.train_eval_promote" in vm_script
+    assert "--policy-training-report" in vm_script
+    assert "--runtime-policy-checkpoint" in vm_script
+    assert "AIC_TRAIN_EVAL_PROMOTE_SUMMARY_PATH=" in vm_script
     assert "\t" not in launch_script
     assert "\t" not in vm_script
 

@@ -13,14 +13,79 @@ REMOTE_AIC_ROOT="${REMOTE_AIC_ROOT:-/home/$USER/src/aic-learned-eval}"
 REMOTE_TARBALL="${REMOTE_TARBALL:-/tmp/aic-learned-eval-src.tgz}"
 LOCAL_TARBALL="${LOCAL_TARBALL:-$AIC_ROOT/artifacts/aic-learned-eval-src.tgz}"
 
+resolve_existing_file() {
+  local path="$1"
+  if [[ "$path" != /* ]]; then
+    path="$AIC_ROOT/$path"
+  fi
+  if [[ ! -f "$path" ]]; then
+    echo "Required file does not exist: $path" >&2
+    exit 2
+  fi
+  local directory
+  directory="$(cd -- "$(dirname -- "$path")" && pwd -P)"
+  printf '%s/%s' "$directory" "$(basename -- "$path")"
+}
+
+run_local_harness_python() {
+  if command -v pixi >/dev/null 2>&1; then
+    (cd "$AIC_ROOT" && pixi run python -m "$@")
+  else
+    (cd "$AIC_ROOT" && PYTHONPATH="$AIC_ROOT${PYTHONPATH:+:$PYTHONPATH}" python3 -m "$@")
+  fi
+}
+
+stage_output_value() {
+  local output="$1"
+  local key="$2"
+  local value
+  value="$(printf '%s\n' "$output" | awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2) }' | tail -n 1)"
+  if [[ -z "$value" ]]; then
+    echo "stage-training-bundle did not emit $key" >&2
+    exit 2
+  fi
+  printf '%s' "$value"
+}
+
 if [[ -z "$AIC_EVAL_RUN_ID" ]]; then
   echo "Set AIC_EVAL_RUN_ID or LEWM_RUN_NAME." >&2
   exit 2
 fi
 
-if [[ ! -f "$AIC_ROOT/aic_lewm_policy/runtime_artifacts/aic_lewm_epoch_100_object.ckpt" ]]; then
-  echo "Missing staged checkpoint under aic_lewm_policy/runtime_artifacts." >&2
+LOCAL_AIC_ROOT="$(cd -- "$AIC_ROOT" && pwd -P)"
+REMOTE_POLICY_TRAINING_REPORT_PATH=""
+REMOTE_RUNTIME_POLICY_CHECKPOINT_PATH=""
+POLICY_TRAINING_REPORT_PATH="${AIC_POLICY_TRAINING_REPORT_PATH:-${AIC_HARNESS_POLICY_TRAINING_REPORT_PATH:-}}"
+POLICY_TRAINING_REPORT_REQUIRED="${AIC_POLICY_TRAINING_REPORT_REQUIRED:-${AIC_HARNESS_POLICY_TRAINING_REPORT_REQUIRED:-0}}"
+if [[ -n "$POLICY_TRAINING_REPORT_PATH" ]]; then
+  if [[ -n "${AIC_RUNTIME_POLICY_CHECKPOINT_PATH:-}" ]]; then
+    echo "AIC_RUNTIME_POLICY_CHECKPOINT_PATH must not be set with AIC_POLICY_TRAINING_REPORT_PATH; the staged training bundle supplies the evaluated checkpoint." >&2
+    exit 2
+  fi
+  LOCAL_POLICY_TRAINING_REPORT_PATH="$(resolve_existing_file "$POLICY_TRAINING_REPORT_PATH")"
+  TRAINING_BUNDLE_REL="aic_lewm_policy/runtime_artifacts/train_eval_promote/$AIC_EVAL_RUN_ID"
+  LOCAL_TRAINING_BUNDLE_ROOT="$AIC_ROOT/$TRAINING_BUNDLE_REL"
+  REMOTE_TRAINING_BUNDLE_ROOT="$REMOTE_AIC_ROOT/$TRAINING_BUNDLE_REL"
+  stage_output="$(run_local_harness_python \
+    aic_signal_harness.train_eval_promote \
+    stage-training-bundle \
+    --policy-training-report "$LOCAL_POLICY_TRAINING_REPORT_PATH" \
+    --bundle-root "$LOCAL_TRAINING_BUNDLE_ROOT" \
+    --runtime-bundle-root "$REMOTE_TRAINING_BUNDLE_ROOT" \
+    --overwrite)"
+  printf '%s\n' "$stage_output"
+  REMOTE_POLICY_TRAINING_REPORT_PATH="$(stage_output_value "$stage_output" AIC_STAGED_RUNTIME_POLICY_TRAINING_REPORT_PATH)"
+  REMOTE_RUNTIME_POLICY_CHECKPOINT_PATH="$(stage_output_value "$stage_output" AIC_STAGED_RUNTIME_POLICY_CHECKPOINT_PATH)"
+elif [[ "$POLICY_TRAINING_REPORT_REQUIRED" != "0" && "$POLICY_TRAINING_REPORT_REQUIRED" != "false" ]]; then
+  echo "AIC_POLICY_TRAINING_REPORT_PATH is required for trained policy eval finalization." >&2
   exit 2
+else
+  LOCAL_RUNTIME_POLICY_CHECKPOINT_PATH="$(resolve_existing_file "${AIC_RUNTIME_POLICY_CHECKPOINT_PATH:-$AIC_ROOT/aic_lewm_policy/runtime_artifacts/aic_lewm_epoch_100_object.ckpt}")"
+  if [[ "$LOCAL_RUNTIME_POLICY_CHECKPOINT_PATH" != "$LOCAL_AIC_ROOT/"* ]]; then
+    echo "AIC_RUNTIME_POLICY_CHECKPOINT_PATH must be under AIC_ROOT so it is staged to the VM." >&2
+    exit 2
+  fi
+  REMOTE_RUNTIME_POLICY_CHECKPOINT_PATH="$REMOTE_AIC_ROOT/${LOCAL_RUNTIME_POLICY_CHECKPOINT_PATH#"$LOCAL_AIC_ROOT/"}"
 fi
 
 if [[ ! -f "$AIC_ROOT/aic_lewm_policy/runtime_artifacts/aic_qualification_train.h5" ]]; then
@@ -71,11 +136,15 @@ export AIC_LEWM_POLICY_TRACE_CONTAINER_PATH='$(quote_for_remote "${AIC_LEWM_POLI
 export AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_IDS='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_IDS:-}")'
 export AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_OFFICIAL_TRIAL_ID_MAP:-}")'
 export AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID='$(quote_for_remote "${AIC_LEWM_POLICY_TRACE_TRUST_TASK_OFFICIAL_TRIAL_ID:-0}")'
-export AIC_HARNESS_GATE_ID='$(quote_for_remote "${AIC_HARNESS_GATE_ID:-live_eval}")'
+export AIC_HARNESS_GATE_ID='$(quote_for_remote "${AIC_HARNESS_GATE_ID:-}")'
 export AIC_HARNESS_MIN_IMPROVEMENT='$(quote_for_remote "${AIC_HARNESS_MIN_IMPROVEMENT:-1.0}")'
 export AIC_HARNESS_LEDGER_PATH='$(quote_for_remote "${AIC_HARNESS_LEDGER_PATH:-}")'
 export AIC_HARNESS_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_BASELINE_PATH:-}")'
 export AIC_HARNESS_UPDATE_BASELINE_PATH='$(quote_for_remote "${AIC_HARNESS_UPDATE_BASELINE_PATH:-}")'
+export AIC_POLICY_TRAINING_REPORT_PATH='$(quote_for_remote "$REMOTE_POLICY_TRAINING_REPORT_PATH")'
+export AIC_POLICY_TRAINING_REPORT_REQUIRED='$(quote_for_remote "$POLICY_TRAINING_REPORT_REQUIRED")'
+export AIC_RUNTIME_POLICY_CHECKPOINT_PATH='$(quote_for_remote "$REMOTE_RUNTIME_POLICY_CHECKPOINT_PATH")'
+export AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH='$(quote_for_remote "${AIC_RUNTIME_POLICY_CHECKPOINT_CONTAINER_PATH:-}")'
 export AIC_HARNESS_EXPERIMENT_ID='$(quote_for_remote "${AIC_HARNESS_EXPERIMENT_ID:-}")'
 export AIC_HARNESS_HYPOTHESIS='$(quote_for_remote "${AIC_HARNESS_HYPOTHESIS:-}")'
 export AIC_HARNESS_BACKEND_KIND='$(quote_for_remote "${AIC_HARNESS_BACKEND_KIND:-}")'
