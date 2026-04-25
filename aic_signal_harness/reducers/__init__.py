@@ -26,6 +26,7 @@ from aic_signal_harness.reducers.policy_trace import (
 )
 from aic_signal_harness.reducers.policy_training import (
     policy_checkpoint_artifact,
+    read_training_dataset_report_artifact,
     record_policy_training_run,
 )
 from aic_signal_harness.reducers.promotion import promote_ledger_entry
@@ -60,6 +61,7 @@ __all__ = [
     "promote_ledger_entry",
     "policy_checkpoint_artifact",
     "read_policy_trace_events",
+    "read_training_dataset_report_artifact",
     "record_policy_training_run",
     "reduce_policy_trace_jsonl",
     "reduce_mcap_eval_bundle",

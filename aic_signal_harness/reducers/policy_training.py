@@ -24,6 +24,7 @@ def record_policy_training_run(
     trainer: TrainerInvocation | Mapping[str, Any],
     policy_artifact: ArtifactRef,
     candidate_policy: PolicyBackendSpec | Mapping[str, Any],
+    policy_training_execution_report: ArtifactRef | None = None,
     metrics: Mapping[str, float] | None = None,
     notes: tuple[str, ...] = (),
 ) -> PolicyTrainingRunReport:
@@ -35,7 +36,7 @@ def record_policy_training_run(
         if isinstance(candidate_policy, PolicyBackendSpec)
         else PolicyBackendSpec.from_dict(candidate_policy)
     )
-    source_report = _validate_source_training_dataset_report(source_training_dataset_report)
+    source_report = read_training_dataset_report_artifact(source_training_dataset_report)
     return PolicyTrainingRunReport(
         run_id=run_id,
         generated_at_utc=generated_at_utc,
@@ -46,6 +47,7 @@ def record_policy_training_run(
         status=PolicyTrainingStatus.completed,
         policy_artifact=policy_artifact,
         candidate_policy=typed_candidate_policy,
+        policy_training_execution_report=policy_training_execution_report,
         metrics={} if metrics is None else metrics,
         notes=notes
         + (
@@ -99,7 +101,9 @@ def policy_checkpoint_artifact(
     )
 
 
-def _validate_source_training_dataset_report(source: ArtifactRef) -> TrainingDatasetReport:
+def read_training_dataset_report_artifact(source: ArtifactRef) -> TrainingDatasetReport:
+    """Read and validate a local training-dataset report artifact."""
+
     errors: list[str] = []
     if source.kind != "training_dataset_report":
         errors.append("source_training_dataset_report.kind must be 'training_dataset_report'")
